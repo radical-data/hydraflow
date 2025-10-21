@@ -26,7 +26,13 @@
 		}
 	});
 
+	const nodeData = $derived(nodes.map((node: IRNode) => ({ id: node.id, type: node.type, data: node.data })));
+	const edgeData = $derived(edges.map((edge: IREdge) => ({ id: edge.id, source: edge.source, target: edge.target })));
+
 	$effect(() => {
+		nodeData;
+		edgeData;
+		
 		if (isInitialized && nodes.length > 0) {
 			execute();
 		}

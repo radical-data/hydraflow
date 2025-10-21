@@ -12,42 +12,33 @@ export function addNode(node: Omit<IRNode, 'id'>): string {
 		id,
 		position: node.position || { x: 0, y: 0 }
 	};
-	nodes.push(newNode);
+	nodes = [...nodes, newNode];
 	return id;
 }
 
 export function updateNodeData(nodeId: string, data: Record<string, any>): void {
-	const nodeIndex = nodes.findIndex(node => node.id === nodeId);
-	if (nodeIndex !== -1) {
-		nodes[nodeIndex] = { ...nodes[nodeIndex], data: { ...nodes[nodeIndex].data, ...data } };
-	}
+	nodes = nodes.map(node => 
+		node.id === nodeId 
+			? { ...node, data: { ...node.data, ...data } }
+			: node
+	);
 }
 
 export function removeNode(nodeId: string): void {
-	const nodeIndex = nodes.findIndex(node => node.id === nodeId);
-	if (nodeIndex !== -1) {
-		nodes.splice(nodeIndex, 1);
-	}
+	nodes = nodes.filter(node => node.id !== nodeId);
 	// Also remove connected edges
-	for (let i = edges.length - 1; i >= 0; i--) {
-		if (edges[i].source === nodeId || edges[i].target === nodeId) {
-			edges.splice(i, 1);
-		}
-	}
+	edges = edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId);
 }
 
 export function addEdge(edge: Omit<IREdge, 'id'>): string {
 	const id = nanoid();
 	const newEdge: IREdge = { ...edge, id };
-	edges.push(newEdge);
+	edges = [...edges, newEdge];
 	return id;
 }
 
 export function removeEdge(edgeId: string): void {
-	const edgeIndex = edges.findIndex(edge => edge.id === edgeId);
-	if (edgeIndex !== -1) {
-		edges.splice(edgeIndex, 1);
-	}
+	edges = edges.filter(edge => edge.id !== edgeId);
 }
 
 export function getConnectedEdges(nodeId: string): IREdge[] {
@@ -67,6 +58,6 @@ export function getNodeConnections(nodeId: string): {
 }
 
 export function clearGraph(): void {
-	nodes.length = 0;
-	edges.length = 0;
+	nodes = [];
+	edges = [];
 }

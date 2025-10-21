@@ -66,5 +66,5 @@
 	<HydraCanvas {nodes} {edges} />
 	
 	<!-- Flow Editor Overlay -->
-	<FlowEditor {nodes} {edges} {addNode} {addEdge} {updateNodeData} />
+	<FlowEditor bind:nodes bind:edges {addNode} {addEdge} {updateNodeData} />
 </div>

@@ -6,8 +6,8 @@
 	import { setContext } from 'svelte';
 
 	let { 
-		nodes, 
-		edges, 
+		nodes = $bindable(), 
+		edges = $bindable(), 
 		addNode, 
 		addEdge, 
 		updateNodeData 
@@ -66,6 +66,7 @@
 			{nodeTypes}
 			fitView
 			class="flow-container"
+			onconnect={(connection) => addEdge({ source: connection.source, target: connection.target })}
 		>
 			<Background />
 			<Controls />
