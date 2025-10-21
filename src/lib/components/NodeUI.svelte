@@ -1,12 +1,18 @@
 <script lang="ts">
-	import { updateNodeData, getNodes } from '../stores/editor.svelte.js';
 	import type { NodeDefinition } from '../types.js';
-	
-	import { Handle } from '@xyflow/svelte';
+	import { Handle, Position } from '@xyflow/svelte';
 
-	export let nodeId: string;
-	export let definition: NodeDefinition;
-	export let data: Record<string, any>;
+	let { 
+		nodeId, 
+		definition, 
+		data, 
+		updateNodeData 
+	} = $props<{
+		nodeId: string;
+		definition: NodeDefinition;
+		data: Record<string, any>;
+		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+	}>();
 
 	function handleChange(inputId: string, value: any) {
 		updateNodeData(nodeId, { [inputId]: value });
@@ -33,7 +39,7 @@
 	{#each Array(handleConfig.inputs) as _, i}
 		<Handle
 			type="target"
-			position="top"
+			position={Position.Top}
 			id="input-{i}"
 			style="top: {20 + i * 30}px;"
 		/>
@@ -91,7 +97,7 @@
 	{#each Array(handleConfig.outputs) as _, i}
 		<Handle
 			type="source"
-			position="bottom"
+			position={Position.Bottom}
 			id="output-{i}"
 			style="bottom: {10 + i * 30}px;"
 		/>

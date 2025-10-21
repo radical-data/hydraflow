@@ -3,19 +3,29 @@
 	import { getAllDefinitions } from '../nodes/registry.js';
 	import type { NodeDefinition } from '../types.js';
 
-	export let id: string;
-	export let type: string;
-	export let data: Record<string, any>;
-	export let selected: boolean = false;
-	export let dragging: boolean = false;
+	let { 
+		id, 
+		type, 
+		data, 
+		selected = false, 
+		dragging = false,
+		updateNodeData
+	} = $props<{
+		id: string;
+		type: string;
+		data: Record<string, any>;
+		selected?: boolean;
+		dragging?: boolean;
+		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+	}>();
 
 	const nodeDefinitions = getAllDefinitions();
-	$: definition = nodeDefinitions.find(d => d.id === type);
+	const definition = $derived(nodeDefinitions.find(d => d.id === type));
 
 </script>
 
 {#if definition}
-	<NodeUI nodeId={id} {definition} {data} />
+	<NodeUI nodeId={id} {definition} {data} {updateNodeData} />
 {:else}
 	<div class="error-node">
 		<p>Unknown node type: {type}</p>

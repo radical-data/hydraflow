@@ -33,6 +33,7 @@ export interface IRNode {
 	id: string;
 	type: string;
 	data: Record<string, any>;
+	position: { x: number; y: number };
 }
 
 export interface IREdge {

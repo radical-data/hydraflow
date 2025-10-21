@@ -1,49 +1,44 @@
 <script lang="ts">
 	import { SvelteFlow, Background, Controls, MiniMap } from '@xyflow/svelte';
-	import { getNodes, getEdges, setNodes, setEdges, addNode, addEdge } from '../stores/editor.svelte.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
-	import NodeWrapper from './NodeWrapper.svelte';
-	import type { NodeDefinition } from '../types.js';
+	import CustomNode from './CustomNode.svelte';
+	import type { NodeDefinition, IRNode, IREdge } from '../types.js';
+	import { setContext } from 'svelte';
+
+	let { 
+		nodes, 
+		edges, 
+		addNode, 
+		addEdge, 
+		updateNodeData 
+	} = $props<{
+		nodes: IRNode[];
+		edges: IREdge[];
+		addNode: (node: Omit<IRNode, 'id'>) => string;
+		addEdge: (edge: Omit<IREdge, 'id'>) => string;
+		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+	}>();
 
 	const nodeDefinitions = getAllDefinitions();
+	
+	setContext('updateNodeData', updateNodeData);
 
 	const nodeTypes = {
-		osc: NodeWrapper,
-		out: NodeWrapper
+		osc: CustomNode,
+		out: CustomNode
 	};
 	function addNodeToFlow(definition: NodeDefinition) {
-		const nodeId = addNode({
+		const x = Math.random() * 400 + 100;
+		const y = Math.random() * 300 + 100;
+		
+		addNode({
 			type: definition.id,
 			data: definition.inputs.reduce((acc, input) => {
 				acc[input.id] = input.default;
 				return acc;
-			}, {} as Record<string, any>)
+			}, {} as Record<string, any>),
+			position: { x, y }
 		});
-		
-		const nodes = getNodes();
-		const node = nodes.find((n: any) => n.id === nodeId);
-		if (node) {
-			const x = Math.random() * 400 + 100;
-			const y = Math.random() * 300 + 100;
-			(node as any).position = { x, y };
-			setNodes([...nodes]);
-		}
-	}
-	function handleBeforeConnect(event: CustomEvent<{ source: string; target: string; sourceHandle?: string; targetHandle?: string }>) {
-		const { source, target, sourceHandle, targetHandle } = event.detail;
-		
-		if (source === target) {
-			return false;
-		}
-		
-		addEdge({
-			source,
-			target,
-			sourceHandle,
-			targetHandle
-		});
-		
-		return false;
 	}
 </script>
 
@@ -51,7 +46,7 @@
 	<div class="toolbar">
 		<h2>Hydra Flow</h2>
 		<div class="debug-info">
-			Nodes: {getNodes().length} | Edges: {getEdges().length}
+			Nodes: {nodes.length} | Edges: {edges.length}
 		</div>
 		<div class="node-buttons">
 			{#each nodeDefinitions as definition}
@@ -66,10 +61,9 @@
 	</div>
 	<div class="flow-canvas">
 		<SvelteFlow
-			bind:nodes={getNodes, setNodes}
-			bind:edges={getEdges, setEdges}
+			bind:nodes={nodes}
+			bind:edges={edges}
 			{nodeTypes}
-			on:beforeconnect={handleBeforeConnect}
 			fitView
 			class="flow-container"
 		>

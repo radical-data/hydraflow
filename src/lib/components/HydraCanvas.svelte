@@ -2,12 +2,11 @@
 	import { onMount, onDestroy } from 'svelte';
 	import type { IRNode, IREdge } from '../types.js';
 
-	export let nodes: IRNode[] = [];
-	export let edges: IREdge[] = [];
+	let { nodes = [], edges = [] } = $props<{ nodes?: IRNode[]; edges?: IREdge[] }>();
 
 	let canvas: HTMLCanvasElement;
 	let engine: any; // HydraEngine - using any to avoid SSR issues
-	let isInitialized = false;
+	let isInitialized = $state(false);
 
 	onMount(async () => {
 		const { HydraEngine } = await import('../engine/HydraEngine.js');
@@ -27,9 +26,11 @@
 		}
 	});
 
-	$: if (isInitialized && nodes.length > 0) {
-		execute();
-	}
+	$effect(() => {
+		if (isInitialized && nodes.length > 0) {
+			execute();
+		}
+	});
 
 	function execute() {
 		if (engine && isInitialized) {
@@ -46,7 +47,7 @@
 		}
 	}
 
-	let resizeObserver: ResizeObserver;
+	let resizeObserver = $state<ResizeObserver>();
 	
 	onMount(() => {
 		if (canvas) {
