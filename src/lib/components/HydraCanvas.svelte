@@ -9,6 +9,9 @@
 	let isInitialized = $state(false);
 
 	onMount(async () => {
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+		
 		const { HydraEngine } = await import('../engine/HydraEngine.js');
 		engine = new HydraEngine();
 		await engine.init(canvas);
@@ -46,31 +49,30 @@
 
 	function handleResize() {
 		if (engine && canvas) {
-			const rect = canvas.getBoundingClientRect();
-			canvas.width = rect.width;
-			canvas.height = rect.height;
-			engine.setResolution(rect.width, rect.height);
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+			engine.setResolution(window.innerWidth, window.innerHeight);
 		}
 	}
 
 	let resizeObserver = $state<ResizeObserver>();
 	
-	onMount(() => {
-		if (canvas) {
-			resizeObserver = new ResizeObserver(handleResize);
-			resizeObserver.observe(canvas);
-		}
-	});
+		onMount(() => {
+			if (canvas) {
+				resizeObserver = new ResizeObserver(handleResize);
+				resizeObserver.observe(canvas);
+			}
+		});
 
-	onDestroy(() => {
-		if (resizeObserver) {
-			resizeObserver.disconnect();
-		}
-	});
+		onDestroy(() => {
+			if (resizeObserver) {
+				resizeObserver.disconnect();
+			}
+		});
 </script>
 
 <canvas
 	bind:this={canvas}
-	class="w-full h-full"
+	class="absolute inset-0 w-full h-full"
 	style="display: block;"
 ></canvas>
