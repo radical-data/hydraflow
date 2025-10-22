@@ -17,6 +17,15 @@
 			position: { x: 100, y: 100 }
 		},
 		{
+			id: 'rotate-1',
+			type: 'rotate',
+			data: {
+				angle: 0.5,
+				speed: 0.1
+			},
+			position: { x: 200, y: 100 }
+		},
+		{
 			id: 'out-1',
 			type: 'out',
 			data: {
@@ -29,6 +38,11 @@
 		{
 			id: 'edge-1',
 			source: 'osc-1',
+			target: 'rotate-1'
+		},
+		{
+			id: 'edge-2',
+			source: 'rotate-1',
 			target: 'out-1'
 		}
 	]);

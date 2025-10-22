@@ -62,34 +62,14 @@ export class HydraEngine {
 			return;
 		}
 
-		const connectedEdges = edges.filter(edge => edge.target === outputNode.id);
-		if (connectedEdges.length === 0) {
-			console.warn('No source connected to output node');
-			return;
-		}
-
-		const sourceEdge = connectedEdges[0];
-		const sourceNode = nodes.find(node => node.id === sourceEdge.source);
-		
-		if (!sourceNode) {
-			console.warn('Source node not found');
-			return;
-		}
-
-		const sourceDefinition = getNodeDefinition(sourceNode.type);
-		if (!sourceDefinition) {
-			console.warn(`No definition found for source node type: ${sourceNode.type}`);
-			return;
-		}
-
-		const ctx = {
-			generators,
-			outputs: this.hydra.outputs
-		};
-
 		try {
-			const sourceChain = sourceDefinition.build(ctx, sourceNode.data);
+			const chain = this.buildChain(nodes, edges, outputNode.id);
 			
+			if (!chain) {
+				console.warn('Failed to build chain');
+				return;
+			}
+
 			const outputIndex = outputNode.data.outputIndex || 0;
 			const targetOutput = this.hydra.outputs[outputIndex];
 			
@@ -98,11 +78,59 @@ export class HydraEngine {
 				return;
 			}
 
-			sourceChain.out(targetOutput);
+			chain.out(targetOutput);
 			
 		} catch (error) {
 			console.error('Error executing graph:', error);
 		}
+	}
+
+	private buildChain(nodes: IRNode[], edges: IREdge[], nodeId: string): any {
+		const node = nodes.find(n => n.id === nodeId);
+		if (!node) return null;
+
+		const definition = getNodeDefinition(node.type);
+		if (!definition) return null;
+
+		const ctx = {
+			generators,
+			outputs: this.hydra!.outputs
+		};
+
+		const inputEdges = edges.filter(edge => edge.target === nodeId);
+		
+		if (definition.category === 'source') {
+			return definition.build(ctx, node.data);
+		} else if (definition.category === 'modifier') {
+			if (inputEdges.length === 0) {
+				console.warn(`Modifier node ${nodeId} has no input`);
+				return null;
+			}
+			
+			const inputEdge = inputEdges[0];
+			const inputChain = this.buildChain(nodes, edges, inputEdge.source);
+			
+			if (!inputChain) {
+				console.warn(`Failed to build input chain for ${nodeId}`);
+				return null;
+			}
+
+			if (node.type === 'rotate') {
+				return inputChain.rotate(node.data.angle, node.data.speed);
+			}
+			
+			return inputChain;
+		} else if (definition.category === 'output') {
+			if (inputEdges.length === 0) {
+				console.warn(`Output node ${nodeId} has no input`);
+				return null;
+			}
+			
+			const inputEdge = inputEdges[0];
+			return this.buildChain(nodes, edges, inputEdge.source);
+		}
+
+		return null;
 	}
 
 	start(): void {

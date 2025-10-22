@@ -1,6 +1,7 @@
 import type { NodeDefinition } from '../types.js';
 import { oscDefinition } from './definitions/osc.js';
 import { outDefinition } from './definitions/out.js';
+import { rotateDefinition } from './definitions/rotate.js';
 
 const nodeDefinitions = new Map<string, NodeDefinition>();
 
@@ -22,3 +23,4 @@ export function getDefinitionsByCategory(category: NodeDefinition['category']): 
 
 registerNodeDefinition(oscDefinition);
 registerNodeDefinition(outDefinition);
+registerNodeDefinition(rotateDefinition);

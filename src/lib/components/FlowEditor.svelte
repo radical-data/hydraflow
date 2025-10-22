@@ -25,7 +25,8 @@
 
 	const nodeTypes = {
 		osc: CustomNode,
-		out: CustomNode
+		out: CustomNode,
+		rotate: CustomNode
 	};
 	function addNodeToFlow(definition: NodeDefinition) {
 		const x = Math.random() * 400 + 100;
