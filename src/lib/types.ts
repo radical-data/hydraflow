@@ -6,7 +6,7 @@ export interface InputSchema {
 	min?: number;
 	max?: number;
 	step?: number;
-	options?: Array<{ value: any; label: string }>; // for 'select'
+	options?: Array<{ value: any; label: string }>;
 }
 
 export interface OutputSchema {

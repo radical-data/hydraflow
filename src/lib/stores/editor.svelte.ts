@@ -1,7 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { IRNode, IREdge } from '../types.js';
 
-// Svelte 5 way: Export reactive state directly
 export let nodes = $state.raw<IRNode[]>([]);
 export let edges = $state.raw<IREdge[]>([]);
 
@@ -26,7 +25,6 @@ export function updateNodeData(nodeId: string, data: Record<string, any>): void 
 
 export function removeNode(nodeId: string): void {
 	nodes = nodes.filter(node => node.id !== nodeId);
-	// Also remove connected edges
 	edges = edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId);
 }
 

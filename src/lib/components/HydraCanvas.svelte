@@ -5,7 +5,7 @@
 	let { nodes = [], edges = [] } = $props<{ nodes?: IRNode[]; edges?: IREdge[] }>();
 
 	let canvas: HTMLCanvasElement;
-	let engine: any; // HydraEngine - using any to avoid SSR issues
+	let engine: any;
 	let isInitialized = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 

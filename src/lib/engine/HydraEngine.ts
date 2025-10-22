@@ -126,7 +126,6 @@ export class HydraEngine {
 				return null;
 			}
 			
-			// Sort edges by target handle to ensure correct order (A, B)
 			const sortedEdges = inputEdges.sort((a, b) => {
 				const aHandle = a.targetHandle || 'input-0';
 				const bHandle = b.targetHandle || 'input-0';

@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { SvelteFlow, Background, Controls, MiniMap } from '@xyflow/svelte';
+	import { SvelteFlow, Background, Controls, MiniMap, Panel } from '@xyflow/svelte';
 	import { getAllDefinitions } from '../nodes/registry.js';
 	import CustomNode from './CustomNode.svelte';
 	import type { NodeDefinition, IRNode, IREdge } from '../types.js';
 	import { setContext } from 'svelte';
+	import { getLayoutedElements } from '../utils/layout.js';
 
 	let { 
 		nodes = $bindable(), 
@@ -43,6 +44,12 @@
 			position: { x, y }
 		});
 	}
+
+	function onLayout(direction: 'TB' | 'LR') {
+		const layouted = getLayoutedElements(nodes, edges, direction);
+		nodes = [...layouted.nodes];
+		edges = [...layouted.edges];
+	}
 </script>
 
 <div class="flow-editor">
@@ -79,6 +86,16 @@
 			<Background />
 			<Controls />
 			<MiniMap />
+			<Panel position="top-right">
+				<div class="layout-buttons">
+					<button onclick={() => onLayout('TB')} class="layout-btn">
+						Vertical
+					</button>
+					<button onclick={() => onLayout('LR')} class="layout-btn">
+						Horizontal
+					</button>
+				</div>
+			</Panel>
 		</SvelteFlow>
 	</div>
 </div>
@@ -136,6 +153,33 @@
 
 	.add-node-btn:hover {
 		background: #1976D2;
+	}
+
+	.layout-buttons {
+		display: flex;
+		gap: 8px;
+		background: rgba(255, 255, 255, 0.95);
+		padding: 12px;
+		border-radius: 8px;
+		backdrop-filter: blur(4px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	}
+
+	.layout-btn {
+		padding: 8px 12px;
+		background: #4CAF50;
+		color: white;
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		font-size: 12px;
+		font-weight: 600;
+		transition: all 0.2s;
+	}
+
+	.layout-btn:hover {
+		background: #45a049;
+		transform: translateY(-1px);
 	}
 
 	.flow-canvas {
