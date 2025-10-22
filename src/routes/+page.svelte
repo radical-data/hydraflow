@@ -14,7 +14,24 @@
 				sync: 0.5,
 				offset: 0.5
 			},
-			position: { x: 100, y: 100 }
+			position: { x: 100, y: 50 }
+		},
+		{
+			id: 'noise-1',
+			type: 'noise',
+			data: {
+				scale: 4.0,
+				offset: 0
+			},
+			position: { x: 100, y: 150 }
+		},
+		{
+			id: 'blend-1',
+			type: 'blend',
+			data: {
+				amount: 0.5
+			},
+			position: { x: 250, y: 100 }
 		},
 		{
 			id: 'rotate-1',
@@ -23,7 +40,7 @@
 				angle: 0.5,
 				speed: 0.1
 			},
-			position: { x: 200, y: 100 }
+			position: { x: 400, y: 100 }
 		},
 		{
 			id: 'out-1',
@@ -31,19 +48,37 @@
 			data: {
 				outputIndex: 0
 			},
-			position: { x: 300, y: 100 }
+			position: { x: 550, y: 100 }
 		}
 	]);
 	let edges = $state.raw<IREdge[]>([
 		{
 			id: 'edge-1',
 			source: 'osc-1',
-			target: 'rotate-1'
+			target: 'blend-1',
+			sourceHandle: 'output-0',
+			targetHandle: 'input-0'
 		},
 		{
 			id: 'edge-2',
+			source: 'noise-1',
+			target: 'blend-1',
+			sourceHandle: 'output-0',
+			targetHandle: 'input-1'
+		},
+		{
+			id: 'edge-3',
+			source: 'blend-1',
+			target: 'rotate-1',
+			sourceHandle: 'output-0',
+			targetHandle: 'input-0'
+		},
+		{
+			id: 'edge-4',
 			source: 'rotate-1',
-			target: 'out-1'
+			target: 'out-1',
+			sourceHandle: 'output-0',
+			targetHandle: 'input-0'
 		}
 	]);
 	
@@ -60,7 +95,12 @@
 	
 	function addEdge(edge: Omit<IREdge, 'id'>): string {
 		const id = nanoid();
-		const newEdge: IREdge = { ...edge, id };
+		const newEdge: IREdge = { 
+			...edge, 
+			id,
+			sourceHandle: edge.sourceHandle,
+			targetHandle: edge.targetHandle
+		};
 		edges = [...edges, newEdge];
 		return id;
 	}

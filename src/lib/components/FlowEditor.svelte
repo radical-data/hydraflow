@@ -26,7 +26,9 @@
 	const nodeTypes = {
 		osc: CustomNode,
 		out: CustomNode,
-		rotate: CustomNode
+		rotate: CustomNode,
+		blend: CustomNode,
+		noise: CustomNode
 	};
 	function addNodeToFlow(definition: NodeDefinition) {
 		const x = Math.random() * 400 + 100;
@@ -67,7 +69,12 @@
 			{nodeTypes}
 			fitView
 			class="flow-container"
-			onconnect={(connection) => addEdge({ source: connection.source, target: connection.target })}
+			onconnect={(connection) => addEdge({ 
+				source: connection.source, 
+				target: connection.target,
+				sourceHandle: connection.sourceHandle,
+				targetHandle: connection.targetHandle
+			})}
 		>
 			<Background />
 			<Controls />

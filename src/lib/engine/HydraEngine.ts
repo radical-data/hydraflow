@@ -120,6 +120,32 @@ export class HydraEngine {
 			}
 			
 			return inputChain;
+		} else if (definition.category === 'mixer') {
+			if (inputEdges.length < 2) {
+				console.warn(`Mixer node ${nodeId} needs 2 inputs, got ${inputEdges.length}`);
+				return null;
+			}
+			
+			// Sort edges by target handle to ensure correct order (A, B)
+			const sortedEdges = inputEdges.sort((a, b) => {
+				const aHandle = a.targetHandle || 'input-0';
+				const bHandle = b.targetHandle || 'input-0';
+				return aHandle.localeCompare(bHandle);
+			});
+			
+			const inputAChain = this.buildChain(nodes, edges, sortedEdges[0].source);
+			const inputBChain = this.buildChain(nodes, edges, sortedEdges[1].source);
+			
+			if (!inputAChain || !inputBChain) {
+				console.warn(`Failed to build input chains for mixer ${nodeId}`);
+				return null;
+			}
+
+			if (node.type === 'blend') {
+				return inputAChain.blend(inputBChain, node.data.amount);
+			}
+			
+			return inputAChain;
 		} else if (definition.category === 'output') {
 			if (inputEdges.length === 0) {
 				console.warn(`Output node ${nodeId} has no input`);

@@ -37,11 +37,14 @@
 
 <div class="node-container">
 	{#each Array(handleConfig.inputs) as _, i}
+		{@const isMixer = definition.category === 'mixer'}
+		{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
+		{@const topOffset = isMixer ? 20 : 20 + i * 30}
 		<Handle
 			type="target"
 			position={Position.Top}
 			id="input-{i}"
-			style="top: {20 + i * 30}px;"
+			style="top: {topOffset}px; left: {leftOffset}px;"
 		/>
 	{/each}
 
