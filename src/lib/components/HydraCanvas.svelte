@@ -7,6 +7,7 @@
 	let canvas: HTMLCanvasElement;
 	let engine: any; // HydraEngine - using any to avoid SSR issues
 	let isInitialized = $state(false);
+	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	onMount(async () => {
 		canvas.width = window.innerWidth;
@@ -24,6 +25,9 @@
 	});
 
 	onDestroy(() => {
+		if (debounceTimer) {
+			clearTimeout(debounceTimer);
+		}
 		if (engine) {
 			engine.destroy();
 		}
@@ -37,9 +41,19 @@
 		edgeData;
 		
 		if (isInitialized && nodes.length > 0) {
-			execute();
+			debouncedExecute();
 		}
 	});
+
+	function debouncedExecute() {
+		if (debounceTimer) {
+			clearTimeout(debounceTimer);
+		}
+		
+		debounceTimer = setTimeout(() => {
+			execute();
+		}, 50);
+	}
 
 	function execute() {
 		if (engine && isInitialized) {
