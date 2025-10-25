@@ -76,12 +76,6 @@
 			{nodeTypes}
 			fitView
 			class="flow-container"
-			onconnect={(connection) => addEdge({ 
-				source: connection.source, 
-				target: connection.target,
-				sourceHandle: connection.sourceHandle,
-				targetHandle: connection.targetHandle
-			})}
 		>
 			<Background />
 			<Controls />
