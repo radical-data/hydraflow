@@ -1,4 +1,4 @@
-import type { NodeDefinition } from '../../types.js';
+import type { HydraChain, NodeDefinition } from '../../types.js';
 
 export const rotateDefinition: NodeDefinition = {
 	id: 'rotate',
@@ -37,6 +37,6 @@ export const rotateDefinition: NodeDefinition = {
 				angle: args.angle,
 				speed: args.speed
 			}
-		} as any;
+		} as HydraChain;
 	}
 };

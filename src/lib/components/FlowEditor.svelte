@@ -3,7 +3,7 @@
 	import { setContext } from 'svelte';
 
 	import { getAllDefinitions } from '../nodes/registry.js';
-	import type { IREdge, IRNode, NodeDefinition } from '../types.js';
+	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
 	import { getLayoutedElements } from '../utils/layout.js';
 	import CustomNode from './CustomNode.svelte';
 
@@ -11,14 +11,12 @@
 		nodes = $bindable(),
 		edges = $bindable(),
 		addNode,
-		addEdge,
 		updateNodeData
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
-		addEdge: (edge: Omit<IREdge, 'id'>) => string;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
 	const nodeDefinitions = getAllDefinitions();
@@ -43,7 +41,7 @@
 					acc[input.id] = input.default;
 					return acc;
 				},
-				{} as Record<string, any>
+				{} as Record<string, InputValue>
 			),
 			position: { x, y }
 		});
@@ -63,7 +61,7 @@
 			Nodes: {nodes.length} | Edges: {edges.length}
 		</div>
 		<div class="node-buttons">
-			{#each nodeDefinitions as definition}
+			{#each nodeDefinitions as definition (definition.id)}
 				<button onclick={() => addNodeToFlow(definition as NodeDefinition)} class="add-node-btn">
 					+ {(definition as NodeDefinition).label}
 				</button>

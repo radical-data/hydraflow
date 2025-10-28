@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { nanoid } from 'nanoid';
-	import { onMount } from 'svelte';
 
 	import FlowEditor from '$lib/components/FlowEditor.svelte';
 	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
-	import type { IREdge, IRNode } from '$lib/types.js';
+	import type { InputValue, IREdge, IRNode } from '$lib/types.js';
 
 	let nodes = $state.raw<IRNode[]>([
 		{
@@ -94,19 +93,7 @@
 		return id;
 	}
 
-	function addEdge(edge: Omit<IREdge, 'id'>): string {
-		const id = nanoid();
-		const newEdge: IREdge = {
-			...edge,
-			id,
-			sourceHandle: edge.sourceHandle,
-			targetHandle: edge.targetHandle
-		};
-		edges = [...edges, newEdge];
-		return id;
-	}
-
-	function updateNodeData(nodeId: string, data: Record<string, any>): void {
+	function updateNodeData(nodeId: string, data: Record<string, InputValue>): void {
 		nodes = nodes.map((node) =>
 			node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
 		);
@@ -118,5 +105,5 @@
 	<HydraCanvas {nodes} {edges} />
 
 	<!-- Flow Editor Overlay -->
-	<FlowEditor bind:nodes bind:edges {addNode} {addEdge} {updateNodeData} />
+	<FlowEditor bind:nodes bind:edges {addNode} {updateNodeData} />
 </div>

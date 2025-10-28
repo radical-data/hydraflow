@@ -1,22 +1,13 @@
 <script lang="ts">
 	import { getAllDefinitions } from '../nodes/registry.js';
-	import type { NodeDefinition } from '../types.js';
+	import type { InputValue } from '../types.js';
 	import NodeUI from './NodeUI.svelte';
 
-	let {
-		id,
-		type,
-		data,
-		selected = false,
-		dragging = false,
-		updateNodeData
-	} = $props<{
+	let { id, type, data, updateNodeData } = $props<{
 		id: string;
 		type: string;
-		data: Record<string, any>;
-		selected?: boolean;
-		dragging?: boolean;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		data: Record<string, InputValue>;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
 	const nodeDefinitions = getAllDefinitions();

@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 
-import type { IREdge, IRNode } from '../types.js';
+import type { InputValue, IREdge, IRNode } from '../types.js';
 
 export let nodes = $state.raw<IRNode[]>([]);
 export let edges = $state.raw<IREdge[]>([]);
@@ -16,7 +16,7 @@ export function addNode(node: Omit<IRNode, 'id'>): string {
 	return id;
 }
 
-export function updateNodeData(nodeId: string, data: Record<string, any>): void {
+export function updateNodeData(nodeId: string, data: Record<string, InputValue>): void {
 	nodes = nodes.map((node) =>
 		node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
 	);

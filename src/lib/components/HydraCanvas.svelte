@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 
+	import { HydraEngine } from '../engine/HydraEngine.js';
 	import type { IREdge, IRNode } from '../types.js';
 
 	let { nodes = [], edges = [] } = $props<{ nodes?: IRNode[]; edges?: IREdge[] }>();
 
 	let canvas: HTMLCanvasElement;
-	let engine: any;
+	let engine: HydraEngine;
 	let isInitialized = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -42,8 +43,8 @@
 	);
 
 	$effect(() => {
-		nodeData;
-		edgeData;
+		void nodeData;
+		void edgeData;
 
 		if (isInitialized && nodes.length > 0) {
 			debouncedExecute();

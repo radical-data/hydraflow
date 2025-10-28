@@ -21,6 +21,9 @@
 	"lint-staged": {
 		"*.{js,ts,svelte,json,md,css,yml,yaml}": [
 			"prettier --write"
+		],
+		"*.{js,ts,svelte}": [
+			"eslint --fix --max-warnings=0"
 		]
 	},
 	"devDependencies": {
