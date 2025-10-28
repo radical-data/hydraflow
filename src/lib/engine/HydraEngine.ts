@@ -1,19 +1,53 @@
-import { Hydra, generators, Output } from 'hydra-ts';
-import createREGL from 'regl';
 import type { IRNode, IREdge } from '../types.js';
-import { getNodeDefinition } from '../nodes/registry.js';
+
+type Issue = { severity: 'error' | 'warning'; message: string; nodeId?: string };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
+
+type TransformType = 'src' | 'coord' | 'color' | 'combine' | 'combineCoord';
+interface HydraMeta {
+	typeOf(name: string): TransformType | undefined;
+	arityOf(name: string): 0 | 1 | 2 | undefined;
+	orderedInputNames(name: string): string[];
+}
+
+// Helper to trim trailing undefined args to preserve positional holes
+const trimUndefTail = (xs: unknown[]) => {
+	const a = [...xs];
+	while (a.length && a[a.length - 1] === undefined) a.pop();
+	return a;
+};
 
 export class HydraEngine {
-	private hydra: Hydra | null = null;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private hydra: any | null = null;
 	private canvas: HTMLCanvasElement | null = null;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private regl: any = null;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private generators: any | null = null;
+	private meta!: HydraMeta;
 	private isInitialized = false;
 
 	async init(canvas: HTMLCanvasElement): Promise<void> {
 		this.canvas = canvas;
-		
+
 		try {
-			this.regl = createREGL({
+			// Dynamic imports to avoid SSR issues
+			const [{ Hydra, generators }, createREGL, metaMod] = await Promise.all([
+				import('hydra-ts'),
+				import('regl'),
+				import('../nodes/hydra-meta')
+			]);
+
+			if (!generators || !metaMod) {
+				throw new Error('hydra-ts meta not loaded');
+			}
+
+			this.generators = generators;
+			this.meta = metaMod as unknown as HydraMeta;
+
+			this.regl = createREGL.default({
 				canvas,
 				attributes: {
 					antialias: true,
@@ -22,6 +56,7 @@ export class HydraEngine {
 			});
 
 			this.hydra = new Hydra({
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				regl: this.regl as any,
 				width: canvas.width,
 				height: canvas.height,
@@ -36,126 +71,278 @@ export class HydraEngine {
 		}
 	}
 
+	private buildChainValidated(
+		nodes: IRNode[],
+		edges: IREdge[],
+		nodeId: string,
+		stack = new Set<string>(),
+		memo = new Map<string, BuildResult>()
+	): BuildResult {
+		// Check for cycles
+		if (stack.has(nodeId)) {
+			return {
+				ok: false,
+				issues: [{ severity: 'error', message: 'Cycle detected', nodeId }]
+			} as BuildResult;
+		}
+
+		// Check memo cache
+		if (memo.has(nodeId)) {
+			return memo.get(nodeId)!;
+		}
+
+		// Memoize node lookup
+		const byId = new Map(nodes.map((n) => [n.id, n]));
+		const node = byId.get(nodeId);
+		if (!node) {
+			const result = {
+				ok: false,
+				issues: [{ severity: 'error', message: `Node ${nodeId} not found` }]
+			} as BuildResult;
+			memo.set(nodeId, result);
+			return result;
+		}
+
+		// Special case for output nodes
+		if (node.type === 'out') {
+			const inputEdges = edges.filter((e) => e.target === nodeId);
+			if (inputEdges.length !== 1) {
+				const result = {
+					ok: false,
+					issues: [
+						{
+							severity: 'error',
+							message: `Output expects exactly 1 input, found ${inputEdges.length}`,
+							nodeId
+						}
+					]
+				} as BuildResult;
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			const outputIndex = Number(node.data?.outputIndex ?? 0);
+			if (
+				!Number.isInteger(outputIndex) ||
+				outputIndex < 0 ||
+				outputIndex >= this.hydra!.outputs.length
+			) {
+				const result = {
+					ok: false,
+					issues: [
+						{
+							severity: 'error',
+							message: `Output index ${outputIndex} out of range (0…${this.hydra!.outputs.length - 1})`,
+							nodeId
+						}
+					]
+				} as BuildResult;
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			// Build the input chain and return it (don't call .out() here)
+			const inputResult = this.buildChainValidated(
+				nodes,
+				edges,
+				inputEdges[0].source,
+				new Set([...stack, nodeId]),
+				memo
+			);
+			memo.set(nodeId, inputResult);
+			return inputResult;
+		}
+
+		// Validate transform exists
+		const tType = this.meta.typeOf(node.type);
+		if (!tType) {
+			const result = {
+				ok: false,
+				issues: [{ severity: 'error', message: `Unknown transform "${node.type}"`, nodeId }]
+			} as BuildResult;
+			memo.set(nodeId, result);
+			return result;
+		}
+
+		// Validate arity
+		const inputEdges = edges.filter((e) => e.target === nodeId);
+		const want = this.meta.arityOf(node.type);
+		const have = inputEdges.length;
+
+		const issues: Issue[] = [];
+		if (want != null && have !== want) {
+			issues.push({
+				severity: have < want ? 'error' : 'warning',
+				message: `${node.type} expects ${want} input(s), found ${have}`,
+				nodeId
+			});
+		}
+
+		// If we don't have enough inputs, stop here
+		if (want != null && have < want) {
+			const result = { ok: false, issues } as BuildResult;
+			memo.set(nodeId, result);
+			return result;
+		}
+
+		// Gather arguments
+		const allNames = this.meta.orderedInputNames(node.type);
+		const paramNames =
+			tType === 'combine' || tType === 'combineCoord'
+				? allNames.slice(1) // drop the implicit 'color' (the second chain)
+				: allNames;
+
+		const rawArgs = paramNames.map((k: string) => (node.data ?? {})[k]);
+
+		// Build chain based on type
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		let chain: any = null;
+
+		if (tType === 'src') {
+			// Start a new chain
+			const callArgs = trimUndefTail(rawArgs);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			chain = (this.generators as any)[node.type](...callArgs);
+		} else if (tType === 'coord' || tType === 'color') {
+			// Unary operation
+			if (inputEdges.length === 0) {
+				const result = {
+					ok: false,
+					issues: [...issues, { severity: 'error', message: `No input for ${node.type}`, nodeId }]
+				} as BuildResult;
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			const inputResult = this.buildChainValidated(
+				nodes,
+				edges,
+				inputEdges[0].source,
+				new Set([...stack, nodeId]),
+				memo
+			);
+			if (!inputResult.ok) {
+				const result = { ok: false, issues: [...issues, ...inputResult.issues] } as BuildResult;
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			const callArgs = trimUndefTail(rawArgs);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			chain = (inputResult.chain as any)[node.type](...callArgs);
+		} else if (tType === 'combine' || tType === 'combineCoord') {
+			// Binary operation
+			if (inputEdges.length < 2) {
+				const result = {
+					ok: false,
+					issues: [
+						...issues,
+						{ severity: 'error', message: `Need 2 inputs for ${node.type}`, nodeId }
+					]
+				} as BuildResult;
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			const sorted = inputEdges.sort((a, b) =>
+				(a.targetHandle ?? 'input-0').localeCompare(b.targetHandle ?? 'input-0')
+			);
+
+			const aResult = this.buildChainValidated(
+				nodes,
+				edges,
+				sorted[0].source,
+				new Set([...stack, nodeId]),
+				memo
+			);
+			const bResult = this.buildChainValidated(
+				nodes,
+				edges,
+				sorted[1].source,
+				new Set([...stack, nodeId]),
+				memo
+			);
+
+			if (!aResult.ok || !bResult.ok) {
+				const result = {
+					ok: false,
+					issues: [
+						...issues,
+						...(aResult.ok ? [] : aResult.issues),
+						...(bResult.ok ? [] : bResult.issues)
+					]
+				} as BuildResult;
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			const callArgs = trimUndefTail(rawArgs);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			chain = (aResult.chain as any)[node.type](bResult.chain, ...callArgs);
+		}
+
+		const result = { ok: true, chain } as BuildResult;
+		memo.set(nodeId, result);
+		return result;
+	}
+
 	executeGraph(nodes: IRNode[], edges: IREdge[]): void {
 		if (!this.hydra || !this.isInitialized) {
 			console.warn('HydraEngine not initialized');
 			return;
 		}
 
-		this.hydra.hush();
+		const outputNodes = nodes.filter((node) => node.type === 'out');
+		const allIssues: Issue[] = [];
 
-		const outputNodes = nodes.filter(node => {
-			const definition = getNodeDefinition(node.type);
-			return definition?.category === 'output';
-		});
+		for (const outputNode of outputNodes) {
+			const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
 
-		if (outputNodes.length === 0) {
-			console.warn('No output nodes found');
-			return;
+			// Validate output index range
+			if (
+				!Number.isInteger(outputIndex) ||
+				outputIndex < 0 ||
+				outputIndex >= this.hydra.outputs.length
+			) {
+				allIssues.push({
+					severity: 'error',
+					message: `Output index ${outputIndex} out of range (0…${this.hydra.outputs.length - 1})`,
+					nodeId: outputNode.id
+				});
+				continue;
+			}
+
+			// Validate exactly one input edge
+			const inEdges = edges.filter((e) => e.target === outputNode.id);
+			if (inEdges.length !== 1) {
+				allIssues.push({
+					severity: 'error',
+					message: `Output expects 1 input, found ${inEdges.length}`,
+					nodeId: outputNode.id
+				});
+				continue;
+			}
+			const inputEdge = inEdges[0];
+
+			// Build the chain
+			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
+			if (!result.ok) {
+				allIssues.push(...result.issues);
+				continue;
+			}
+
+			// Execute the chain
+			try {
+				result.chain.out(this.hydra.outputs[outputIndex]);
+			} catch (err) {
+				console.error(`Error executing output ${outputIndex}:`, err);
+			}
 		}
 
-		const outputNode = outputNodes[0];
-		const outputDefinition = getNodeDefinition(outputNode.type);
-		
-		if (!outputDefinition) {
-			console.warn(`No definition found for node type: ${outputNode.type}`);
-			return;
+		// Log any issues
+		if (allIssues.length > 0) {
+			console.error('Graph issues:', allIssues);
 		}
-
-		try {
-			const chain = this.buildChain(nodes, edges, outputNode.id);
-			
-			if (!chain) {
-				console.warn('Failed to build chain');
-				return;
-			}
-
-			const outputIndex = outputNode.data.outputIndex || 0;
-			const targetOutput = this.hydra.outputs[outputIndex];
-			
-			if (!targetOutput) {
-				console.warn(`Output ${outputIndex} not available`);
-				return;
-			}
-
-			chain.out(targetOutput);
-			
-		} catch (error) {
-			console.error('Error executing graph:', error);
-		}
-	}
-
-	private buildChain(nodes: IRNode[], edges: IREdge[], nodeId: string): any {
-		const node = nodes.find(n => n.id === nodeId);
-		if (!node) return null;
-
-		const definition = getNodeDefinition(node.type);
-		if (!definition) return null;
-
-		const ctx = {
-			generators,
-			outputs: this.hydra!.outputs
-		};
-
-		const inputEdges = edges.filter(edge => edge.target === nodeId);
-		
-		if (definition.category === 'source') {
-			return definition.build(ctx, node.data);
-		} else if (definition.category === 'modifier') {
-			if (inputEdges.length === 0) {
-				console.warn(`Modifier node ${nodeId} has no input`);
-				return null;
-			}
-			
-			const inputEdge = inputEdges[0];
-			const inputChain = this.buildChain(nodes, edges, inputEdge.source);
-			
-			if (!inputChain) {
-				console.warn(`Failed to build input chain for ${nodeId}`);
-				return null;
-			}
-
-			if (node.type === 'rotate') {
-				return inputChain.rotate(node.data.angle, node.data.speed);
-			}
-			
-			return inputChain;
-		} else if (definition.category === 'mixer') {
-			if (inputEdges.length < 2) {
-				console.warn(`Mixer node ${nodeId} needs 2 inputs, got ${inputEdges.length}`);
-				return null;
-			}
-			
-			const sortedEdges = inputEdges.sort((a, b) => {
-				const aHandle = a.targetHandle || 'input-0';
-				const bHandle = b.targetHandle || 'input-0';
-				return aHandle.localeCompare(bHandle);
-			});
-			
-			const inputAChain = this.buildChain(nodes, edges, sortedEdges[0].source);
-			const inputBChain = this.buildChain(nodes, edges, sortedEdges[1].source);
-			
-			if (!inputAChain || !inputBChain) {
-				console.warn(`Failed to build input chains for mixer ${nodeId}`);
-				return null;
-			}
-
-			if (node.type === 'blend') {
-				return inputAChain.blend(inputBChain, node.data.amount);
-			}
-			
-			return inputAChain;
-		} else if (definition.category === 'output') {
-			if (inputEdges.length === 0) {
-				console.warn(`Output node ${nodeId} has no input`);
-				return null;
-			}
-			
-			const inputEdge = inputEdges[0];
-			return this.buildChain(nodes, edges, inputEdge.source);
-		}
-
-		return null;
 	}
 
 	start(): void {
