@@ -222,7 +222,10 @@ export class HydraEngine {
 				memo
 			);
 			if (!inputResult.ok) {
-				const result = { ok: false, issues: [...issues, ...inputResult.issues] } as BuildResult;
+				const result: BuildResult = {
+					ok: false,
+					issues: [...issues, ...(inputResult as { ok: false; issues: Issue[] }).issues]
+				};
 				memo.set(nodeId, result);
 				return result;
 			}
@@ -264,14 +267,14 @@ export class HydraEngine {
 			);
 
 			if (!aResult.ok || !bResult.ok) {
-				const result = {
+				const result: BuildResult = {
 					ok: false,
 					issues: [
 						...issues,
-						...(aResult.ok ? [] : aResult.issues),
-						...(bResult.ok ? [] : bResult.issues)
+						...(aResult.ok ? [] : (aResult as { ok: false; issues: Issue[] }).issues),
+						...(bResult.ok ? [] : (bResult as { ok: false; issues: Issue[] }).issues)
 					]
-				} as BuildResult;
+				};
 				memo.set(nodeId, result);
 				return result;
 			}
@@ -327,7 +330,7 @@ export class HydraEngine {
 			// Build the chain
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
 			if (!result.ok) {
-				allIssues.push(...result.issues);
+				allIssues.push(...(result as { ok: false; issues: Issue[] }).issues);
 				continue;
 			}
 
