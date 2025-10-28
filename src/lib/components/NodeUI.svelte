@@ -1,20 +1,16 @@
 <script lang="ts">
-	import type { NodeDefinition } from '../types.js';
 	import { Handle, Position } from '@xyflow/svelte';
 
-	let { 
-		nodeId, 
-		definition, 
-		data, 
-		updateNodeData 
-	} = $props<{
+	import type { InputValue, NodeDefinition } from '../types.js';
+
+	let { nodeId, definition, data, updateNodeData } = $props<{
 		nodeId: string;
 		definition: NodeDefinition;
-		data: Record<string, any>;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		data: Record<string, InputValue>;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
-	function handleChange(inputId: string, value: any) {
+	function handleChange(inputId: string, value: InputValue) {
 		updateNodeData(nodeId, { [inputId]: value });
 	}
 	function getHandleConfig() {
@@ -36,7 +32,7 @@
 </script>
 
 <div class="node-container">
-	{#each Array(handleConfig.inputs) as _, i}
+	{#each Array(handleConfig.inputs), i (i)}
 		{@const isMixer = definition.category === 'mixer'}
 		{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
 		{@const topOffset = isMixer ? 20 : 20 + i * 30}
@@ -52,20 +48,21 @@
 		{definition.label}
 	</div>
 	<div class="node-controls">
-		{#each definition.inputs as input}
+		{#each definition.inputs as input (input.id)}
 			<div class="control-group">
-				<label for="{input.id}">{input.label}</label>
-				
+				<label for={input.id}>{input.label}</label>
+
 				{#if input.type === 'number'}
 					{@const currentValue = data[input.id] ?? input.default}
 					<input
-						id="{input.id}"
+						id={input.id}
 						type="range"
 						min={input.min ?? 0}
 						max={input.max ?? 1}
 						step={input.step ?? 0.01}
 						value={currentValue}
-						oninput={(e) => handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
+						oninput={(e) =>
+							handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
 						class="nodrag nopan nowheel"
 					/>
 					<span class="value-display">
@@ -74,19 +71,19 @@
 				{:else if input.type === 'select'}
 					{@const currentValue = data[input.id] ?? input.default}
 					<select
-						id="{input.id}"
+						id={input.id}
 						value={currentValue}
 						onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
 						class="nodrag nopan nowheel"
 					>
-						{#each input.options ?? [] as option}
+						{#each input.options ?? [] as option (option)}
 							<option value={option.value}>{option.label}</option>
 						{/each}
 					</select>
 				{:else if input.type === 'boolean'}
 					{@const currentValue = data[input.id] ?? input.default}
 					<input
-						id="{input.id}"
+						id={input.id}
 						type="checkbox"
 						checked={currentValue}
 						onchange={(e) => handleChange(input.id, (e.target as HTMLInputElement).checked)}
@@ -97,7 +94,7 @@
 		{/each}
 	</div>
 
-	{#each Array(handleConfig.outputs) as _, i}
+	{#each Array(handleConfig.outputs), i (i)}
 		<Handle
 			type="source"
 			position={Position.Bottom}
@@ -150,7 +147,7 @@
 		letter-spacing: 0.5px;
 	}
 
-	.control-group input[type="range"] {
+	.control-group input[type='range'] {
 		width: 100%;
 		height: 4px;
 		background: #e5e7eb;
@@ -159,7 +156,7 @@
 		margin: 4px 0;
 	}
 
-	.control-group input[type="range"]::-webkit-slider-thumb {
+	.control-group input[type='range']::-webkit-slider-thumb {
 		appearance: none;
 		width: 12px;
 		height: 12px;
@@ -168,7 +165,7 @@
 		cursor: pointer;
 	}
 
-	.control-group input[type="range"]::-moz-range-thumb {
+	.control-group input[type='range']::-moz-range-thumb {
 		width: 12px;
 		height: 12px;
 		background: #ec4899;
