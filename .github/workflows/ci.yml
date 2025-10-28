@@ -17,7 +17,7 @@ jobs:
           version: 9.12.3
       - uses: actions/setup-node@v4
         with:
-          node-version: '20.11.0'
+          node-version: '20.19'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
