@@ -3,15 +3,25 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"packageManager": "pnpm@9.12.3",
+	"engines": {
+		"node": ">=20.11"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "husky && svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
+		"format:check": "prettier --check .",
 		"lint": "prettier --check . && eslint ."
+	},
+	"lint-staged": {
+		"*.{js,ts,svelte,json,md,css,yml,yaml}": [
+			"prettier --write"
+		]
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
@@ -22,8 +32,11 @@
 		"@types/node": "^22",
 		"eslint": "^9.36.0",
 		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-simple-import-sort": "^12.0.0",
 		"eslint-plugin-svelte": "^3.12.4",
 		"globals": "^16.4.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^15.2.10",
 		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.4.0",
 		"svelte": "^5.39.5",

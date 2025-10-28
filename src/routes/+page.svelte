@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { nanoid } from 'nanoid';
-	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
+	import { onMount } from 'svelte';
+
 	import FlowEditor from '$lib/components/FlowEditor.svelte';
-	import type { IRNode, IREdge } from '$lib/types.js';
-	
+	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
+	import type { IREdge, IRNode } from '$lib/types.js';
+
 	let nodes = $state.raw<IRNode[]>([
 		{
 			id: 'osc-1',
@@ -81,7 +82,7 @@
 			targetHandle: 'input-0'
 		}
 	]);
-	
+
 	function addNode(node: Omit<IRNode, 'id'>): string {
 		const id = nanoid();
 		const newNode: IRNode = {
@@ -92,11 +93,11 @@
 		nodes = [...nodes, newNode];
 		return id;
 	}
-	
+
 	function addEdge(edge: Omit<IREdge, 'id'>): string {
 		const id = nanoid();
-		const newEdge: IREdge = { 
-			...edge, 
+		const newEdge: IREdge = {
+			...edge,
 			id,
 			sourceHandle: edge.sourceHandle,
 			targetHandle: edge.targetHandle
@@ -104,21 +105,18 @@
 		edges = [...edges, newEdge];
 		return id;
 	}
-	
+
 	function updateNodeData(nodeId: string, data: Record<string, any>): void {
-		nodes = nodes.map(node => 
-			node.id === nodeId 
-				? { ...node, data: { ...node.data, ...data } }
-				: node
+		nodes = nodes.map((node) =>
+			node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
 		);
 	}
-
 </script>
 
 <div class="w-full h-screen bg-black relative">
 	<!-- Fullscreen Canvas Background -->
 	<HydraCanvas {nodes} {edges} />
-	
+
 	<!-- Flow Editor Overlay -->
 	<FlowEditor bind:nodes bind:edges {addNode} {addEdge} {updateNodeData} />
 </div>

@@ -1,8 +1,8 @@
+import type { TransformDefinition } from 'hydra-ts';
 import {
 	defaultGenerators as generatorTransforms,
 	defaultModifiers as modifierTransforms
 } from 'hydra-ts';
-import type { TransformDefinition } from 'hydra-ts';
 
 const ARITY: Record<TransformDefinition['type'], 0 | 1 | 2> = {
 	src: 0,

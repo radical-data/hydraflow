@@ -1,4 +1,4 @@
-import type { IRNode, IREdge } from '../types.js';
+import type { IREdge, IRNode } from '../types.js';
 
 type Issue = { severity: 'error' | 'warning'; message: string; nodeId?: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

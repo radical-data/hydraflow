@@ -1,13 +1,9 @@
 <script lang="ts">
-	import type { NodeDefinition } from '../types.js';
 	import { Handle, Position } from '@xyflow/svelte';
 
-	let { 
-		nodeId, 
-		definition, 
-		data, 
-		updateNodeData 
-	} = $props<{
+	import type { NodeDefinition } from '../types.js';
+
+	let { nodeId, definition, data, updateNodeData } = $props<{
 		nodeId: string;
 		definition: NodeDefinition;
 		data: Record<string, any>;
@@ -54,18 +50,19 @@
 	<div class="node-controls">
 		{#each definition.inputs as input}
 			<div class="control-group">
-				<label for="{input.id}">{input.label}</label>
-				
+				<label for={input.id}>{input.label}</label>
+
 				{#if input.type === 'number'}
 					{@const currentValue = data[input.id] ?? input.default}
 					<input
-						id="{input.id}"
+						id={input.id}
 						type="range"
 						min={input.min ?? 0}
 						max={input.max ?? 1}
 						step={input.step ?? 0.01}
 						value={currentValue}
-						oninput={(e) => handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
+						oninput={(e) =>
+							handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
 						class="nodrag nopan nowheel"
 					/>
 					<span class="value-display">
@@ -74,7 +71,7 @@
 				{:else if input.type === 'select'}
 					{@const currentValue = data[input.id] ?? input.default}
 					<select
-						id="{input.id}"
+						id={input.id}
 						value={currentValue}
 						onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
 						class="nodrag nopan nowheel"
@@ -86,7 +83,7 @@
 				{:else if input.type === 'boolean'}
 					{@const currentValue = data[input.id] ?? input.default}
 					<input
-						id="{input.id}"
+						id={input.id}
 						type="checkbox"
 						checked={currentValue}
 						onchange={(e) => handleChange(input.id, (e.target as HTMLInputElement).checked)}
@@ -150,7 +147,7 @@
 		letter-spacing: 0.5px;
 	}
 
-	.control-group input[type="range"] {
+	.control-group input[type='range'] {
 		width: 100%;
 		height: 4px;
 		background: #e5e7eb;
@@ -159,7 +156,7 @@
 		margin: 4px 0;
 	}
 
-	.control-group input[type="range"]::-webkit-slider-thumb {
+	.control-group input[type='range']::-webkit-slider-thumb {
 		appearance: none;
 		width: 12px;
 		height: 12px;
@@ -168,7 +165,7 @@
 		cursor: pointer;
 	}
 
-	.control-group input[type="range"]::-moz-range-thumb {
+	.control-group input[type='range']::-moz-range-thumb {
 		width: 12px;
 		height: 12px;
 		background: #ec4899;
