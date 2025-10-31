@@ -60,29 +60,6 @@
 			engine.executeGraph(nodes, edges);
 		}
 	}
-
-	function handleResize() {
-		if (engine && canvas) {
-			canvas.width = window.innerWidth;
-			canvas.height = window.innerHeight;
-			engine.setResolution(window.innerWidth, window.innerHeight);
-		}
-	}
-
-	let resizeObserver = $state<ResizeObserver>();
-	
-		onMount(() => {
-			if (canvas) {
-				resizeObserver = new ResizeObserver(handleResize);
-				resizeObserver.observe(canvas);
-			}
-		});
-
-		onDestroy(() => {
-			if (resizeObserver) {
-				resizeObserver.disconnect();
-			}
-		});
 </script>
 
 <canvas
