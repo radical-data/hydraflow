@@ -1,14 +1,16 @@
 <script lang="ts">
-	import type { NodeDefinition } from '../types.js';
 	import { Handle, Position, useNodeConnections } from '@xyflow/svelte';
+
+	import type { InputValue, NodeDefinition } from '../types.js';
 
 	let { nodeId, definition, data, updateNodeData } = $props<{
 		nodeId: string;
 		definition: NodeDefinition;
-		data: Record<string, any>;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		data: Record<string, InputValue>;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
-	function handleChange(inputId: string, value: any) {
+
+	function handleChange(inputId: string, value: InputValue) {
 		updateNodeData(nodeId, { [inputId]: value });
 	}
 	function getHandleConfig() {
@@ -45,7 +47,7 @@
 </script>
 
 <div class="node-container">
-	{#each Array(handleConfig.inputs) as _, i}
+	{#each Array(handleConfig.inputs), i (i)}
 		{@const isMixer = definition.category === 'mixer'}
 		{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
 		{@const topOffset = isMixer ? 20 : 20 + i * 30}
@@ -62,7 +64,7 @@
 		{definition.label}
 	</div>
 	<div class="node-controls">
-		{#each definition.inputs as input}
+		{#each definition.inputs as input (input.id)}
 			<div class="control-group">
 				<label for={input.id}>{input.label}</label>
 
@@ -90,7 +92,7 @@
 						onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
 						class="nodrag nopan nowheel"
 					>
-						{#each input.options ?? [] as option}
+						{#each input.options ?? [] as option (option)}
 							<option value={option.value}>{option.label}</option>
 						{/each}
 					</select>
@@ -108,7 +110,7 @@
 		{/each}
 	</div>
 
-	{#each Array(handleConfig.outputs) as _, i}
+	{#each Array(handleConfig.outputs), i (i)}
 		<Handle
 			type="source"
 			position={Position.Bottom}

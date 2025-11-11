@@ -1,27 +1,26 @@
 <script lang="ts">
-	import { SvelteFlow, Background, Controls, MiniMap, Panel } from '@xyflow/svelte';
-	import { getAllDefinitions } from '../nodes/registry.js';
-	import CustomNode from './CustomNode.svelte';
-	import type { NodeDefinition, IRNode, IREdge } from '../types.js';
+	import { Background, Controls, MiniMap, Panel, SvelteFlow } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
-	import { getLayoutedElements } from '../utils/layout.js';
 
-	let { 
-		nodes = $bindable(), 
-		edges = $bindable(), 
-		addNode, 
-		addEdge, 
-		updateNodeData 
+	import { getAllDefinitions } from '../nodes/registry.js';
+	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
+	import { getLayoutedElements } from '../utils/layout.js';
+	import CustomNode from './CustomNode.svelte';
+
+	let {
+		nodes = $bindable(),
+		edges = $bindable(),
+		addNode,
+		updateNodeData
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
-		addEdge: (edge: Omit<IREdge, 'id'>) => string;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
 	const nodeDefinitions = getAllDefinitions();
-	
+
 	setContext('updateNodeData', updateNodeData);
 
 	const nodeTypes = {
@@ -34,13 +33,16 @@
 	function addNodeToFlow(definition: NodeDefinition) {
 		const x = Math.random() * 400 + 100;
 		const y = Math.random() * 300 + 100;
-		
+
 		addNode({
 			type: definition.id,
-			data: definition.inputs.reduce((acc, input) => {
-				acc[input.id] = input.default;
-				return acc;
-			}, {} as Record<string, any>),
+			data: definition.inputs.reduce(
+				(acc, input) => {
+					acc[input.id] = input.default;
+					return acc;
+				},
+				{} as Record<string, InputValue>
+			),
 			position: { x, y }
 		});
 	}
@@ -59,35 +61,22 @@
 			Nodes: {nodes.length} | Edges: {edges.length}
 		</div>
 		<div class="node-buttons">
-			{#each nodeDefinitions as definition}
-				<button 
-					onclick={() => addNodeToFlow(definition as NodeDefinition)}
-					class="add-node-btn"
-				>
+			{#each nodeDefinitions as definition (definition.id)}
+				<button onclick={() => addNodeToFlow(definition as NodeDefinition)} class="add-node-btn">
 					+ {(definition as NodeDefinition).label}
 				</button>
 			{/each}
 		</div>
 	</div>
 	<div class="flow-canvas">
-		<SvelteFlow
-			bind:nodes={nodes}
-			bind:edges={edges}
-			{nodeTypes}
-			fitView
-			class="flow-container"
-		>
+		<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView class="flow-container">
 			<Background />
 			<Controls />
 			<MiniMap />
 			<Panel position="top-right">
 				<div class="layout-buttons">
-					<button onclick={() => onLayout('TB')} class="layout-btn">
-						Vertical
-					</button>
-					<button onclick={() => onLayout('LR')} class="layout-btn">
-						Horizontal
-					</button>
+					<button onclick={() => onLayout('TB')} class="layout-btn"> Vertical </button>
+					<button onclick={() => onLayout('LR')} class="layout-btn"> Horizontal </button>
 				</div>
 			</Panel>
 		</SvelteFlow>
@@ -136,7 +125,7 @@
 
 	.add-node-btn {
 		padding: 6px 12px;
-		background: #2196F3;
+		background: #2196f3;
 		color: white;
 		border: none;
 		border-radius: 4px;
@@ -146,7 +135,7 @@
 	}
 
 	.add-node-btn:hover {
-		background: #1976D2;
+		background: #1976d2;
 	}
 
 	.layout-buttons {
@@ -161,7 +150,7 @@
 
 	.layout-btn {
 		padding: 8px 12px;
-		background: #4CAF50;
+		background: #4caf50;
 		color: white;
 		border: none;
 		border-radius: 6px;

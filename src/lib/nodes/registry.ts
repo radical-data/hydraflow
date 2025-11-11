@@ -1,9 +1,9 @@
 import type { NodeDefinition } from '../types.js';
+import { blendDefinition } from './definitions/blend.js';
+import { noiseDefinition } from './definitions/noise.js';
 import { oscDefinition } from './definitions/osc.js';
 import { outDefinition } from './definitions/out.js';
 import { rotateDefinition } from './definitions/rotate.js';
-import { blendDefinition } from './definitions/blend.js';
-import { noiseDefinition } from './definitions/noise.js';
 
 const nodeDefinitions = new Map<string, NodeDefinition>();
 
@@ -20,7 +20,7 @@ export function getAllDefinitions(): NodeDefinition[] {
 }
 
 export function getDefinitionsByCategory(category: NodeDefinition['category']): NodeDefinition[] {
-	return getAllDefinitions().filter(def => def.category === category);
+	return getAllDefinitions().filter((def) => def.category === category);
 }
 
 registerNodeDefinition(oscDefinition);

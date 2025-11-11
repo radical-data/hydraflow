@@ -1,12 +1,14 @@
+export type InputValue = string | number | boolean;
+
 export interface InputSchema {
 	id: string;
 	label: string;
 	type: 'number' | 'select' | 'boolean' | 'vec2' | 'vec3' | 'vec4' | 'texture';
-	default: any;
+	default: InputValue;
 	min?: number;
 	max?: number;
 	step?: number;
-	options?: Array<{ value: any; label: string }>;
+	options?: Array<{ value: InputValue; label: string }>;
 }
 
 export interface OutputSchema {
@@ -20,7 +22,7 @@ export interface NodeDefinition {
 	category: 'source' | 'modifier' | 'mixer' | 'output';
 	inputs: InputSchema[];
 	outputs: OutputSchema[];
-	build: (ctx: HydraBuildCtx, args: Record<string, any>) => HydraChain;
+	build: (ctx: HydraBuildCtx, args: Record<string, InputValue>) => HydraChain;
 }
 
 export interface HydraBuildCtx {
@@ -28,11 +30,11 @@ export interface HydraBuildCtx {
 	outputs: import('hydra-ts').Output[];
 }
 
-export type HydraChain = import('hydra-ts').Glsl;
+export type HydraChain = unknown; // TODO: Fix when hydra-ts types are resolved
 export interface IRNode {
 	id: string;
 	type: string;
-	data: Record<string, any>;
+	data: Record<string, InputValue>;
 	position: { x: number; y: number };
 }
 

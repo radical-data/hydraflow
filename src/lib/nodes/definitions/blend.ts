@@ -1,4 +1,4 @@
-import type { NodeDefinition } from '../../types.js';
+import type { HydraChain, NodeDefinition } from '../../types.js';
 
 export const blendDefinition: NodeDefinition = {
 	id: 'blend',
@@ -27,6 +27,6 @@ export const blendDefinition: NodeDefinition = {
 			args: {
 				amount: args.amount
 			}
-		} as any;
+		} as HydraChain;
 	}
 };

@@ -1,4 +1,5 @@
 node_modules
+.pnpm-store
 
 # Output
 .output
@@ -7,6 +8,7 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+dist
 
 # OS
 .DS_Store

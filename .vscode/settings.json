@@ -1,0 +1,9 @@
+{
+	"editor.formatOnSave": true,
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": "explicit"
+	},
+	"files.eol": "\n",
+	"svelte.enable-ts-plugin": true
+}

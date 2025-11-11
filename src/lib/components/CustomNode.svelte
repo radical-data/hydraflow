@@ -1,29 +1,17 @@
 <script lang="ts">
-	import NodeWrapper from './NodeWrapper.svelte';
 	import { getContext } from 'svelte';
 
-	let { 
-		id, 
-		type, 
-		data, 
-		selected = false, 
-		dragging = false 
-	} = $props<{
+	import type { InputValue } from '../types.js';
+	import NodeWrapper from './NodeWrapper.svelte';
+
+	let { id, type, data } = $props<{
 		id: string;
 		type: string;
-		data: Record<string, any>;
-		selected?: boolean;
-		dragging?: boolean;
+		data: Record<string, InputValue>;
 	}>();
-	
-	const updateNodeData = getContext<(nodeId: string, data: Record<string, any>) => void>('updateNodeData');
+
+	const updateNodeData =
+		getContext<(nodeId: string, data: Record<string, InputValue>) => void>('updateNodeData');
 </script>
 
-<NodeWrapper 
-	{id}
-	{type}
-	{data}
-	{selected}
-	{dragging}
-	{updateNodeData}
-/>
+<NodeWrapper {id} {type} {data} {updateNodeData} />
