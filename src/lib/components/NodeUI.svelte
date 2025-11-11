@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Handle, Position } from '@xyflow/svelte';
+	import { Handle, Position, useNodeConnections } from '@xyflow/svelte';
 
 	import type { InputValue, NodeDefinition } from '../types.js';
 
@@ -29,6 +29,21 @@
 	}
 
 	const handleConfig = getHandleConfig();
+
+	// derive per-handle connectable flags: a handle is connectable if it has 0 connections
+	const inputHandleConnections = $derived(
+		Array.from({ length: handleConfig.inputs }, (_, i) =>
+			useNodeConnections({ handleType: 'target', handleId: `input-${i}` })
+		)
+	);
+	const inputsConnectable = $derived(inputHandleConnections.map((c) => c.current.length === 0));
+
+	const outputHandleConnections = $derived(
+		Array.from({ length: handleConfig.outputs }, (_, i) =>
+			useNodeConnections({ handleType: 'source', handleId: `output-${i}` })
+		)
+	);
+	const outputsConnectable = $derived(outputHandleConnections.map((c) => c.current.length === 0));
 </script>
 
 <div class="node-container">
@@ -41,6 +56,7 @@
 			position={Position.Top}
 			id="input-{i}"
 			style="top: {topOffset}px; left: {leftOffset}px;"
+			isConnectable={inputsConnectable[i]}
 		/>
 	{/each}
 
@@ -100,6 +116,7 @@
 			position={Position.Bottom}
 			id="output-{i}"
 			style="bottom: {10 + i * 30}px;"
+			isConnectable={outputsConnectable[i]}
 		/>
 	{/each}
 </div>

@@ -28,6 +28,21 @@ export class HydraEngine {
 	private generators: any | null = null;
 	private meta!: HydraMeta;
 	private isInitialized = false;
+	private onResizeHandler: (() => void) | null = null;
+
+	private onWindowResize(): void {
+		if (!this.canvas) return;
+
+		this.canvas.width = window.innerWidth;
+		this.canvas.height = window.innerHeight;
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(this.regl as any)?.poll?.();
+
+		if (this.hydra) {
+			this.hydra.setResolution(this.canvas.width, this.canvas.height);
+		}
+	}
 
 	async init(canvas: HTMLCanvasElement): Promise<void> {
 		this.canvas = canvas;
@@ -63,6 +78,9 @@ export class HydraEngine {
 				numOutputs: 4,
 				numSources: 4
 			});
+
+			this.onResizeHandler = () => this.onWindowResize();
+			window.addEventListener('resize', this.onResizeHandler);
 
 			this.isInitialized = true;
 		} catch (error) {
@@ -367,6 +385,10 @@ export class HydraEngine {
 	}
 
 	destroy(): void {
+		if (this.onResizeHandler) {
+			window.removeEventListener('resize', this.onResizeHandler);
+			this.onResizeHandler = null;
+		}
 		if (this.hydra) {
 			this.hydra.loop.stop();
 			this.hydra = null;
