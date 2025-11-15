@@ -135,6 +135,7 @@
 	.node-buttons {
 		display: flex;
 		gap: 8px;
+		overflow-x: auto;
 	}
 
 	.add-node-btn {
