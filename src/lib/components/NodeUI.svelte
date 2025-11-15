@@ -84,7 +84,9 @@
 					</span>
 				{:else if input.type === 'select'}
 					{@const currentValue = data[input.id] ?? input.default}
+					<!-- TODO: enable select when output can be sources -->
 					<select
+						disabled
 						id={input.id}
 						value={Number(currentValue)}
 						onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
