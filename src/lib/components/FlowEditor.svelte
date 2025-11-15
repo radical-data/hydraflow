@@ -21,6 +21,10 @@
 		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
 	}>();
 
+	const edgeTypes: EdgeTypes = {
+		default: CustomEdge
+	};
+
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
 	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
 
@@ -42,9 +46,6 @@
 		});
 	});
 
-	const edgeTypes: EdgeTypes = {
-		default: CustomEdge
-	};
 	function addNodeToFlow(definition: NodeDefinition) {
 		const x = Math.random() * 400 + 100;
 		const y = Math.random() * 300 + 100;
