@@ -77,14 +77,16 @@
 					</span>
 				{:else if input.type === 'select'}
 					{@const currentValue = data[input.id] ?? input.default}
+					<!-- TODO: enable select when output can be sources -->
 					<select
+						disabled
 						id={input.id}
-						value={currentValue}
+						value={Number(currentValue)}
 						onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
 						class="nodrag nopan nowheel"
 					>
 						{#each input.options ?? [] as option}
-							<option value={option.value}>{option.label}</option>
+							<option value={Number(option.value)}>{option.label}</option>
 						{/each}
 					</select>
 				{:else if input.type === 'boolean'}
