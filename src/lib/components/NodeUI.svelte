@@ -35,13 +35,6 @@
 		)
 	);
 	const inputsConnectable = $derived(inputHandleConnections.map((c) => c.current.length === 0));
-
-	const outputHandleConnections = $derived(
-		Array.from({ length: handleConfig.outputs }, (_, i) =>
-			useNodeConnections({ handleType: 'source', handleId: `output-${i}` })
-		)
-	);
-	const outputsConnectable = $derived(outputHandleConnections.map((c) => c.current.length === 0));
 </script>
 
 <div class="node-container">
@@ -114,7 +107,6 @@
 			position={Position.Bottom}
 			id="output-{i}"
 			style="bottom: {10 + i * 30}px;"
-			isConnectable={outputsConnectable[i]}
 		/>
 	{/each}
 </div>

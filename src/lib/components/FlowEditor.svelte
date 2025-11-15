@@ -2,17 +2,28 @@
 	import { SvelteFlow, Background, Controls, MiniMap, Panel } from '@xyflow/svelte';
 	import { getAllDefinitions } from '../nodes/registry.js';
 	import CustomNode from './CustomNode.svelte';
+	import CustomEdge from './CustomEdge.svelte';
 	import type { NodeDefinition, IRNode, IREdge } from '../types.js';
+	import type { EdgeTypes } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
 	import { getLayoutedElements } from '../utils/layout.js';
 
-	let { nodes = $bindable(), edges = $bindable(), addNode, updateNodeData } = $props<{
+	let {
+		nodes = $bindable(),
+		edges = $bindable(),
+		addNode,
+		updateNodeData
+	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
 		addEdge: (edge: Omit<IREdge, 'id'>) => string;
 		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
 	}>();
+
+	const edgeTypes: EdgeTypes = {
+		default: CustomEdge
+	};
 
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
 	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
@@ -34,6 +45,7 @@
 			);
 		});
 	});
+
 	function addNodeToFlow(definition: NodeDefinition) {
 		const x = Math.random() * 400 + 100;
 		const y = Math.random() * 300 + 100;
@@ -65,20 +77,20 @@
 			Nodes: {nodes.length} | Edges: {edges.length}
 		</div>
 		<div class="node-buttons">
-		{#if nodeDefinitions.length === 0}
-			<div class="loading">Loading nodes...</div>
-		{:else}
-			{#each nodeDefinitions as definition (definition.id)}
-				<button onclick={() => addNodeToFlow(definition as NodeDefinition)} class="add-node-btn">
-					+ {(definition as NodeDefinition).label}
-				</button>
-			{/each}
-		{/if}
+			{#if nodeDefinitions.length === 0}
+				<div class="loading">Loading nodes...</div>
+			{:else}
+				{#each nodeDefinitions as definition (definition.id)}
+					<button onclick={() => addNodeToFlow(definition as NodeDefinition)} class="add-node-btn">
+						+ {(definition as NodeDefinition).label}
+					</button>
+				{/each}
+			{/if}
 		</div>
 	</div>
 	<div class="flow-canvas">
 		{#if Object.keys(nodeTypes).length > 0}
-			<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView class="flow-container">
+			<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} fitView class="flow-container">
 				<Background />
 				<Controls />
 				<MiniMap />
