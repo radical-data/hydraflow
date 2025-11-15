@@ -8,12 +8,11 @@
 	import { setContext } from 'svelte';
 	import { getLayoutedElements } from '../utils/layout.js';
 
-	let { 
-		nodes = $bindable(), 
-		edges = $bindable(), 
-		addNode, 
-		addEdge, 
-		updateNodeData 
+	let {
+		nodes = $bindable(),
+		edges = $bindable(),
+		addNode,
+		updateNodeData
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
@@ -22,17 +21,26 @@
 		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
 	}>();
 
-	const nodeDefinitions = getAllDefinitions();
-	
-	setContext('updateNodeData', updateNodeData);
+	let nodeDefinitions = $state<NodeDefinition[]>([]);
+	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
 
-	const nodeTypes = {
-		osc: CustomNode,
-		out: CustomNode,
-		rotate: CustomNode,
-		blend: CustomNode,
-		noise: CustomNode
-	};
+	setContext('updateNodeData', updateNodeData);
+	setContext('nodeDefinitions', () => nodeDefinitions); // Provide definitions via context
+
+	// Load node definitions asynchronously
+	$effect(() => {
+		getAllDefinitions().then((definitions) => {
+			nodeDefinitions = definitions;
+			// Dynamically generate nodeTypes from all registered definitions
+			nodeTypes = definitions.reduce(
+				(types, def) => {
+					types[def.id] = CustomNode;
+					return types;
+				},
+				{} as Record<string, typeof CustomNode>
+			);
+		});
+	});
 
 	const edgeTypes: EdgeTypes = {
 		default: CustomEdge
@@ -40,13 +48,16 @@
 	function addNodeToFlow(definition: NodeDefinition) {
 		const x = Math.random() * 400 + 100;
 		const y = Math.random() * 300 + 100;
-		
+
 		addNode({
 			type: definition.id,
-			data: definition.inputs.reduce((acc, input) => {
-				acc[input.id] = input.default;
-				return acc;
-			}, {} as Record<string, any>),
+			data: definition.inputs.reduce(
+				(acc, input) => {
+					acc[input.id] = input.default;
+					return acc;
+				},
+				{} as Record<string, any>
+			),
 			position: { x, y }
 		});
 	}
@@ -65,32 +76,35 @@
 			Nodes: {nodes.length} | Edges: {edges.length}
 		</div>
 		<div class="node-buttons">
-			{#each nodeDefinitions as definition}
-				<button 
-					onclick={() => addNodeToFlow(definition as NodeDefinition)}
-					class="add-node-btn"
-				>
-					+ {(definition as NodeDefinition).label}
-				</button>
-			{/each}
+			{#if nodeDefinitions.length === 0}
+				<div class="loading">Loading nodes...</div>
+			{:else}
+				{#each nodeDefinitions as definition (definition.id)}
+					<button onclick={() => addNodeToFlow(definition as NodeDefinition)} class="add-node-btn">
+						+ {(definition as NodeDefinition).label}
+					</button>
+				{/each}
+			{/if}
 		</div>
 	</div>
 	<div class="flow-canvas">
-		<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} fitView class="flow-container">
-			<Background />
-			<Controls />
-			<MiniMap />
-			<Panel position="top-right">
-				<div class="layout-buttons">
-					<button onclick={() => onLayout('TB')} class="layout-btn">
-						Vertical
-					</button>
-					<button onclick={() => onLayout('LR')} class="layout-btn">
-						Horizontal
-					</button>
-				</div>
-			</Panel>
-		</SvelteFlow>
+		{#if Object.keys(nodeTypes).length > 0}
+			<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} fitView class="flow-container">
+				<Background />
+				<Controls />
+				<MiniMap />
+				<Panel position="top-right">
+					<div class="layout-buttons">
+						<button onclick={() => onLayout('TB')} class="layout-btn"> Vertical </button>
+						<button onclick={() => onLayout('LR')} class="layout-btn"> Horizontal </button>
+					</div>
+				</Panel>
+			</SvelteFlow>
+		{:else}
+			<div class="loading-canvas">
+				<div class="loading-message">Initializing Hydra Flow...</div>
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -132,11 +146,12 @@
 	.node-buttons {
 		display: flex;
 		gap: 8px;
+		overflow-x: auto;
 	}
 
 	.add-node-btn {
 		padding: 6px 12px;
-		background: #2196F3;
+		background: #2196f3;
 		color: white;
 		border: none;
 		border-radius: 4px;
@@ -146,7 +161,13 @@
 	}
 
 	.add-node-btn:hover {
-		background: #1976D2;
+		background: #1976d2;
+	}
+
+	.loading {
+		font-size: 12px;
+		color: #666;
+		padding: 6px 12px;
 	}
 
 	.layout-buttons {
@@ -161,7 +182,7 @@
 
 	.layout-btn {
 		padding: 8px 12px;
-		background: #4CAF50;
+		background: #4caf50;
 		color: white;
 		border: none;
 		border-radius: 6px;
@@ -179,6 +200,24 @@
 	.flow-canvas {
 		flex: 1;
 		position: relative;
+	}
+
+	.loading-canvas {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(0, 0, 0, 0.05);
+	}
+
+	.loading-message {
+		font-size: 18px;
+		color: #666;
+		background: rgba(255, 255, 255, 0.9);
+		padding: 20px 40px;
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 	}
 
 	/* SvelteFlow overrides for transparency and smaller nodes */
