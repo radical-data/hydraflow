@@ -76,13 +76,7 @@
 		</div>
 	</div>
 	<div class="flow-canvas">
-		<SvelteFlow
-			bind:nodes={nodes}
-			bind:edges={edges}
-			{nodeTypes}
-			fitView
-			class="flow-container"
-		>
+		<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} fitView class="flow-container">
 			<Background />
 			<Controls />
 			<MiniMap />
