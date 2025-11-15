@@ -2,7 +2,9 @@
 	import { SvelteFlow, Background, Controls, MiniMap, Panel } from '@xyflow/svelte';
 	import { getAllDefinitions } from '../nodes/registry.js';
 	import CustomNode from './CustomNode.svelte';
+	import CustomEdge from './CustomEdge.svelte';
 	import type { NodeDefinition, IRNode, IREdge } from '../types.js';
+	import type { EdgeTypes } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
 	import { getLayoutedElements } from '../utils/layout.js';
 
@@ -30,6 +32,10 @@
 		rotate: CustomNode,
 		blend: CustomNode,
 		noise: CustomNode
+	};
+
+	const edgeTypes: EdgeTypes = {
+		default: CustomEdge
 	};
 	function addNodeToFlow(definition: NodeDefinition) {
 		const x = Math.random() * 400 + 100;
