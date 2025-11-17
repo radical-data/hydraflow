@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Handle, Position, useNodeConnections } from '@xyflow/svelte';
 
-	import type { InputValue, NodeDefinition } from '../types.js';
+	import type { InputSchema, InputValue, NodeDefinition } from '../types.js';
 
 	let { nodeId, definition, data, updateNodeData } = $props<{
 		nodeId: string;
@@ -38,88 +38,106 @@
 	);
 	const inputsConnectable = $derived(inputHandleConnections.map((c) => c.current.length === 0));
 
-	const outputHandleConnections = $derived(
-		Array.from({ length: handleConfig.outputs }, (_, i) =>
-			useNodeConnections({ handleType: 'source', handleId: `output-${i}` })
-		)
-	);
-	const outputsConnectable = $derived(outputHandleConnections.map((c) => c.current.length === 0));
+	const isEndNode = $derived(definition.inputs.some((input: InputSchema) => input.type === 'end'));
+
+	// Create arrays of indices for each blocks
+	const inputIndices = $derived(Array.from({ length: handleConfig.inputs }, (_, i) => i));
+	const outputIndices = $derived(Array.from({ length: handleConfig.outputs }, (_, i) => i));
 </script>
 
-<div class="node-container">
-	{#each Array(handleConfig.inputs), i (i)}
-		{@const isMixer = definition.category === 'mixer'}
-		{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
-		{@const topOffset = isMixer ? 20 : 20 + i * 30}
-		<Handle
-			type="target"
-			position={Position.Top}
-			id="input-{i}"
-			style="top: {topOffset}px; left: {leftOffset}px;"
-			isConnectable={inputsConnectable[i]}
-		/>
-	{/each}
-
-	<div class="node-header">
-		{definition.label}
+{#if isEndNode}
+	<div>
+		{#each inputIndices as i (i)}
+			<Handle
+				type="target"
+				position={Position.Top}
+				id="input-{i}"
+				style="top: -2px; left: 50%; transform: translateX(-50%); z-index: 10;"
+				isConnectable={inputsConnectable[i]}
+			/>
+		{/each}
+		<div class="node-container circular">
+			<span class="circular-label">
+				{definition.label}
+			</span>
+		</div>
 	</div>
-	<div class="node-controls">
-		{#each definition.inputs as input (input.id)}
-			<div class="control-group">
-				<label for={input.id}>{input.label}</label>
+{:else}
+	<div class="node-container">
+		{#each inputIndices as i (i)}
+			{@const isMixer = definition.category === 'mixer'}
+			{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
+			{@const topOffset = isMixer ? 20 : 20 + i * 30}
+			<Handle
+				type="target"
+				position={Position.Top}
+				id="input-{i}"
+				style="top: {topOffset}px; left: {leftOffset}px;"
+				isConnectable={inputsConnectable[i]}
+			/>
+		{/each}
 
-				{#if input.type === 'number'}
-					{@const currentValue = data[input.id] ?? input.default}
-					<input
-						id={input.id}
-						type="range"
-						min={input.min ?? 0}
-						max={input.max ?? 1}
-						step={input.step ?? 0.01}
-						value={currentValue}
-						oninput={(e) =>
-							handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
-						class="nodrag nopan nowheel"
-					/>
-					<span class="value-display">
-						{currentValue.toFixed?.(2) ?? currentValue}
-					</span>
-				{:else if input.type === 'select'}
-					{@const currentValue = data[input.id] ?? input.default}
-					<select
-						id={input.id}
-						value={currentValue}
-						onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
-						class="nodrag nopan nowheel"
-					>
-						{#each input.options ?? [] as option (option)}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
-				{:else if input.type === 'boolean'}
-					{@const currentValue = data[input.id] ?? input.default}
-					<input
-						id={input.id}
-						type="checkbox"
-						checked={currentValue}
-						onchange={(e) => handleChange(input.id, (e.target as HTMLInputElement).checked)}
-						class="nodrag nopan nowheel"
-					/>
-				{/if}
-			</div>
+		<div class="node-header">
+			{definition.label}
+		</div>
+		<div class="node-controls">
+			{#each definition.inputs as input (input.id)}
+				<div class="control-group">
+					<label for={input.id}>{input.label}</label>
+
+					{#if input.type === 'number'}
+						{@const currentValue = data[input.id] ?? input.default}
+						<input
+							id={input.id}
+							type="range"
+							min={input.min ?? 0}
+							max={input.max ?? 1}
+							step={input.step ?? 0.01}
+							value={currentValue}
+							oninput={(e) =>
+								handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
+							class="nodrag nopan nowheel"
+						/>
+						<span class="value-display">
+							{currentValue.toFixed?.(2) ?? currentValue}
+						</span>
+					{:else if input.type === 'select'}
+						{@const currentValue = data[input.id] ?? input.default}
+						<select
+							disabled
+							id={input.id}
+							value={Number(currentValue)}
+							onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
+							class="nodrag nopan nowheel"
+						>
+							{#each input.options ?? [] as option (option.value)}
+								<option value={Number(option.value)}>{option.label}</option>
+							{/each}
+						</select>
+					{:else if input.type === 'boolean'}
+						{@const currentValue = data[input.id] ?? input.default}
+						<input
+							id={input.id}
+							type="checkbox"
+							checked={currentValue}
+							onchange={(e) => handleChange(input.id, (e.target as HTMLInputElement).checked)}
+							class="nodrag nopan nowheel"
+						/>
+					{/if}
+				</div>
+			{/each}
+		</div>
+
+		{#each outputIndices as i (i)}
+			<Handle
+				type="source"
+				position={Position.Bottom}
+				id="output-{i}"
+				style="bottom: {10 + i * 30}px;"
+			/>
 		{/each}
 	</div>
-
-	{#each Array(handleConfig.outputs), i (i)}
-		<Handle
-			type="source"
-			position={Position.Bottom}
-			id="output-{i}"
-			style="bottom: {10 + i * 30}px;"
-			isConnectable={outputsConnectable[i]}
-		/>
-	{/each}
-</div>
+{/if}
 
 <style>
 	.node-container {
@@ -130,6 +148,29 @@
 		min-width: 180px;
 		max-width: 200px;
 		position: relative;
+	}
+
+	.node-container.circular {
+		width: 80px;
+		height: 80px;
+		min-width: 80px;
+		max-width: 80px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #ec4899;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+		padding: 0;
+	}
+
+	.circular-label {
+		color: white;
+		font-size: 11px;
+		font-weight: 600;
+		text-align: center;
+		padding: 0 8px;
+		line-height: 1.2;
 	}
 
 	.node-header {

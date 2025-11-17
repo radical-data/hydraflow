@@ -3,8 +3,9 @@ export type InputValue = string | number | boolean;
 export interface InputSchema {
 	id: string;
 	label: string;
-	type: 'number' | 'select' | 'boolean' | 'vec2' | 'vec3' | 'vec4' | 'texture';
-	default: InputValue;
+	type: 'number' | 'select' | 'boolean' | 'vec2' | 'vec3' | 'vec4' | 'texture' | 'end';
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	default: any;
 	min?: number;
 	max?: number;
 	step?: number;

@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { getAllDefinitions } from '../nodes/registry.js';
-	import type { InputValue } from '../types.js';
+	import { getContext } from 'svelte';
+
+	import type { InputValue, NodeDefinition } from '../types.js';
 	import NodeUI from './NodeUI.svelte';
 
 	let { id, type, data, updateNodeData } = $props<{
@@ -10,8 +11,9 @@
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
-	const nodeDefinitions = getAllDefinitions();
-	const definition = $derived(nodeDefinitions.find((d) => d.id === type));
+	// Get node definitions from context (reactive)
+	const getNodeDefinitions = getContext<() => NodeDefinition[]>('nodeDefinitions');
+	const definition = $derived(getNodeDefinitions().find((d) => d.id === type));
 </script>
 
 {#if definition}
@@ -19,7 +21,11 @@
 {:else}
 	<div class="error-node">
 		<p>Unknown node type: {type}</p>
-		<p>Available types: {nodeDefinitions.map((d) => d.id).join(', ')}</p>
+		<p>
+			Available types: {getNodeDefinitions()
+				.map((d) => d.id)
+				.join(', ')}
+		</p>
 	</div>
 {/if}
 

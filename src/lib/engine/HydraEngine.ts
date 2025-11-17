@@ -5,11 +5,14 @@ type Issue = { severity: 'error' | 'warning'; message: string; nodeId?: string }
 type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
 
 type TransformType = 'src' | 'coord' | 'color' | 'combine' | 'combineCoord';
-interface HydraMeta {
-	typeOf(name: string): TransformType | undefined;
-	arityOf(name: string): 0 | 1 | 2 | undefined;
-	orderedInputNames(name: string): string[];
-}
+
+const ARITY: Record<TransformType, 0 | 1 | 2> = {
+	src: 0,
+	coord: 1,
+	color: 1,
+	combine: 2,
+	combineCoord: 2
+};
 
 // Helper to trim trailing undefined args to preserve positional holes
 const trimUndefTail = (xs: unknown[]) => {
@@ -26,9 +29,13 @@ export class HydraEngine {
 	private regl: any = null;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private generators: any | null = null;
-	private meta!: HydraMeta;
 	private isInitialized = false;
 	private onResizeHandler: (() => void) | null = null;
+
+	// Metadata caches for synchronous access
+	private arityByName = new Map<string, 0 | 1 | 2>();
+	private typeByName = new Map<string, TransformType>();
+	private inputsByName = new Map<string, string[]>();
 
 	private onWindowResize(): void {
 		if (!this.canvas) return;
@@ -49,18 +56,21 @@ export class HydraEngine {
 
 		try {
 			// Dynamic imports to avoid SSR issues
-			const [{ Hydra, generators }, createREGL, metaMod] = await Promise.all([
-				import('hydra-ts'),
-				import('regl'),
-				import('../nodes/hydra-meta')
-			]);
-
-			if (!generators || !metaMod) {
-				throw new Error('hydra-ts meta not loaded');
-			}
+			const [{ Hydra, generators, defaultGenerators, defaultModifiers }, createREGL] =
+				await Promise.all([import('hydra-ts'), import('regl')]);
 
 			this.generators = generators;
-			this.meta = metaMod as unknown as HydraMeta;
+
+			// Build metadata maps from Hydra's transform definitions
+			const allTransforms = [...defaultGenerators, ...defaultModifiers];
+			for (const transform of allTransforms) {
+				this.arityByName.set(transform.name, ARITY[transform.type]);
+				this.typeByName.set(transform.name, transform.type);
+				this.inputsByName.set(
+					transform.name,
+					transform.inputs.map((i) => i.name)
+				);
+			}
 
 			this.regl = createREGL.default({
 				canvas,
@@ -172,7 +182,7 @@ export class HydraEngine {
 		}
 
 		// Validate transform exists
-		const tType = this.meta.typeOf(node.type);
+		const tType = this.typeByName.get(node.type);
 		if (!tType) {
 			const result = {
 				ok: false,
@@ -184,7 +194,7 @@ export class HydraEngine {
 
 		// Validate arity
 		const inputEdges = edges.filter((e) => e.target === nodeId);
-		const want = this.meta.arityOf(node.type);
+		const want = this.arityByName.get(node.type);
 		const have = inputEdges.length;
 
 		const issues: Issue[] = [];
@@ -204,7 +214,7 @@ export class HydraEngine {
 		}
 
 		// Gather arguments
-		const allNames = this.meta.orderedInputNames(node.type);
+		const allNames = this.inputsByName.get(node.type) ?? [];
 		const paramNames =
 			tType === 'combine' || tType === 'combineCoord'
 				? allNames.slice(1) // drop the implicit 'color' (the second chain)

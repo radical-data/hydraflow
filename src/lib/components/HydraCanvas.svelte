@@ -43,6 +43,7 @@
 	);
 
 	$effect(() => {
+		// Track nodeData and edgeData for reactivity
 		void nodeData;
 		void edgeData;
 

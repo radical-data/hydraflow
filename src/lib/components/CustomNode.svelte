@@ -11,7 +11,8 @@
 	}>();
 
 	const updateNodeData =
-		getContext<(nodeId: string, data: Record<string, InputValue>) => void>('updateNodeData');
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		getContext<(nodeId: string, data: Record<string, any>) => void>('updateNodeData');
 </script>
 
 <NodeWrapper {id} {type} {data} {updateNodeData} />
