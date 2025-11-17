@@ -8,7 +8,7 @@ export const outDefinition: NodeDefinition = {
 		{
 			id: 'outputIndex',
 			label: 'Output',
-			type: 'select',
+			type: 'end',
 			default: 0,
 			options: [
 				{ value: 0, label: 'Output 0' },
