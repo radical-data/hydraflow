@@ -1,7 +1,7 @@
 export interface InputSchema {
 	id: string;
 	label: string;
-	type: 'number' | 'select' | 'boolean' | 'vec2' | 'vec3' | 'vec4' | 'texture';
+	type: 'number' | 'select' | 'boolean' | 'vec2' | 'vec3' | 'vec4' | 'texture' | 'end';
 	default: any;
 	min?: number;
 	max?: number;
