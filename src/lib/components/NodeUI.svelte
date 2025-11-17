@@ -35,13 +35,11 @@
 		)
 	);
 	const inputsConnectable = $derived(inputHandleConnections.map((c) => c.current.length === 0));
-	
-	const hasEndInput = $derived(
-		definition.inputs.some((input: InputSchema) => input.type === 'end')
-	);
+
+	const isEndNode = $derived(definition.inputs.some((input: InputSchema) => input.type === 'end'));
 </script>
 
-{#if hasEndInput}
+{#if isEndNode}
 	<div>
 		{#each Array(handleConfig.inputs) as _, i}
 			<Handle
@@ -130,20 +128,10 @@
 				position={Position.Bottom}
 				id="output-{i}"
 				style="bottom: {10 + i * 30}px;"
-				isConnectable={outputsConnectable[i]}
 			/>
 		{/each}
 	</div>
-
-	{#each Array(handleConfig.outputs) as _, i}
-		<Handle
-			type="source"
-			position={Position.Bottom}
-			id="output-{i}"
-			style="bottom: {10 + i * 30}px;"
-		/>
-	{/each}
-</div>
+{/if}
 
 <style>
 	.node-container {
