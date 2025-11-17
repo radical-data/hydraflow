@@ -35,14 +35,7 @@
 		)
 	);
 	const inputsConnectable = $derived(inputHandleConnections.map((c) => c.current.length === 0));
-
-	const outputHandleConnections = $derived(
-		Array.from({ length: handleConfig.outputs }, (_, i) =>
-			useNodeConnections({ handleType: 'source', handleId: `output-${i}` })
-		)
-	);
-	const outputsConnectable = $derived(outputHandleConnections.map((c) => c.current.length === 0));
-
+	
 	const hasEndInput = $derived(
 		definition.inputs.some((input: InputSchema) => input.type === 'end')
 	);
@@ -141,7 +134,16 @@
 			/>
 		{/each}
 	</div>
-{/if}
+
+	{#each Array(handleConfig.outputs) as _, i}
+		<Handle
+			type="source"
+			position={Position.Bottom}
+			id="output-{i}"
+			style="bottom: {10 + i * 30}px;"
+		/>
+	{/each}
+</div>
 
 <style>
 	.node-container {
