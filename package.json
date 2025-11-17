@@ -54,5 +54,10 @@
 		"hydra-ts": "^1.0.0",
 		"nanoid": "^5.1.6",
 		"regl": "^2.1.1"
+	},
+	"pnpm": {
+		"patchedDependencies": {
+			"hydra-ts@1.0.0": "patches/hydra-ts@1.0.0.patch"
+		}
 	}
 }
