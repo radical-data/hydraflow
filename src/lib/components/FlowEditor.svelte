@@ -81,6 +81,20 @@
 	setContext('validationByNodeId', () => validationByNodeId());
 	setContext('edgeValidationById', () => edgeValidationById());
 
+	let lastIssueKeys = new Set<string>();
+
+	$effect(() => {
+		const issues = validationIssues ?? [];
+		const keys = new Set(issues.map((i) => i.key));
+		const changed =
+			keys.size !== lastIssueKeys.size || Array.from(keys).some((k) => !lastIssueKeys.has(k));
+
+		if (changed && issues.length > 0) {
+			console.error('Graph issues:', issues);
+			lastIssueKeys = keys;
+		}
+	});
+
 	$effect(() => {
 		getAllDefinitions().then((definitions) => {
 			nodeDefinitions = definitions;
