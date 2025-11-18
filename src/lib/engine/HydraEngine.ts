@@ -362,17 +362,11 @@ export class HydraEngine {
 				continue;
 			}
 
-			// Execute the chain
 			try {
 				result.chain.out(this.hydra.outputs[outputIndex]);
 			} catch (err) {
 				console.error(`Error executing output ${outputIndex}:`, err);
 			}
-		}
-
-		// Log any issues
-		if (allIssues.length > 0) {
-			console.error('Graph issues:', allIssues);
 		}
 
 		return allIssues;

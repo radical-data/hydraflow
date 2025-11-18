@@ -13,15 +13,12 @@
 		nodes = $bindable(),
 		edges = $bindable(),
 		addNode,
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		addEdge,
 		updateNodeData,
 		validationIssues = []
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
-		addEdge: (edge: Omit<IREdge, 'id'>) => string;
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 		validationIssues?: Issue[];
 	}>();
@@ -80,15 +77,13 @@
 	});
 
 	setContext('updateNodeData', updateNodeData);
-	setContext('nodeDefinitions', () => nodeDefinitions); // Provide definitions via context
+	setContext('nodeDefinitions', () => nodeDefinitions);
 	setContext('validationByNodeId', () => validationByNodeId());
 	setContext('edgeValidationById', () => edgeValidationById());
 
-	// Load node definitions asynchronously
 	$effect(() => {
 		getAllDefinitions().then((definitions) => {
 			nodeDefinitions = definitions;
-			// Dynamically generate nodeTypes from all registered definitions
 			nodeTypes = definitions.reduce(
 				(types, def) => {
 					types[def.id] = CustomNode;
