@@ -4,7 +4,13 @@
 	import type { Issue } from '../engine/HydraEngine.js';
 	import type { InputSchema, InputValue, NodeDefinition } from '../types.js';
 
-	let { nodeId, definition, data, updateNodeData, validationStatus } = $props<{
+	let {
+		nodeId,
+		definition,
+		data,
+		updateNodeData,
+		validationStatus = null
+	} = $props<{
 		nodeId: string;
 		definition: NodeDefinition;
 		data: Record<string, InputValue>;
@@ -51,6 +57,8 @@
 	const outputIndices = $derived(Array.from({ length: handleConfig.outputs }, (_, i) => i));
 	const hasError = $derived(!!validationStatus?.hasError);
 	const hasWarning = $derived(!hasError && !!validationStatus?.hasWarning);
+	// Normalise issues so the template never sees `undefined`
+	const issues = $derived(validationStatus?.issues ?? []);
 </script>
 
 {#if isEndNode}
@@ -141,9 +149,9 @@
 			{/each}
 		</div>
 
-		{#if validationStatus && validationStatus.issues.length > 0}
+		{#if issues.length > 0}
 			<ul class="validation-messages">
-				{#each validationStatus.issues as issue, i (i)}
+				{#each issues as issue, i (i)}
 					<li
 						class:message-error={issue.severity === 'error'}
 						class:message-warning={issue.severity === 'warning'}

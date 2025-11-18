@@ -2,7 +2,6 @@
 	import type { EdgeTypes } from '@xyflow/svelte';
 	import { Background, Controls, MiniMap, Panel, SvelteFlow } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
-	import { SvelteMap } from 'svelte/reactivity';
 
 	import type { Issue } from '../engine/HydraEngine.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
@@ -45,41 +44,45 @@
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
 	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
 
-	const nodeValidationById = new SvelteMap<string, NodeValidationStatus>();
-	const edgeValidationById = new SvelteMap<string, EdgeValidationStatus>();
-
-	$effect(() => {
-		nodeValidationById.clear();
+	const validationByNodeId = $derived(() => {
+		// We intentionally build a fresh Map snapshot from validationIssues each time to avoid
+		// mutating reactive containers inside effects, which was causing update-at-update errors.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const map = new Map<string, NodeValidationStatus>();
 		for (const issue of validationIssues) {
 			if (!issue.nodeId) continue;
-			let status = nodeValidationById.get(issue.nodeId);
+			let status = map.get(issue.nodeId);
 			if (!status) {
 				status = { hasError: false, hasWarning: false, issues: [] };
-				nodeValidationById.set(issue.nodeId, status);
+				map.set(issue.nodeId, status);
 			}
 			status.issues.push(issue);
 			if (issue.severity === 'error') status.hasError = true;
 			if (issue.severity === 'warning') status.hasWarning = true;
 		}
+		return map;
 	});
 
-	$effect(() => {
-		edgeValidationById.clear();
+	const edgeValidationById = $derived(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const map = new Map<string, EdgeValidationStatus>();
+		const nodeMap = validationByNodeId();
 		for (const edge of edges) {
-			const sourceStatus = nodeValidationById.get(edge.source);
-			const targetStatus = nodeValidationById.get(edge.target);
+			const sourceStatus = nodeMap.get(edge.source);
+			const targetStatus = nodeMap.get(edge.target);
 			const hasError = !!sourceStatus?.hasError || !!targetStatus?.hasError;
 			const hasWarning = !hasError && (!!sourceStatus?.hasWarning || !!targetStatus?.hasWarning);
 			if (hasError || hasWarning) {
-				edgeValidationById.set(edge.id, { hasError, hasWarning });
+				map.set(edge.id, { hasError, hasWarning });
 			}
 		}
+		return map;
 	});
 
 	setContext('updateNodeData', updateNodeData);
 	setContext('nodeDefinitions', () => nodeDefinitions); // Provide definitions via context
-	setContext('nodeValidationById', nodeValidationById);
-	setContext('edgeValidationById', edgeValidationById);
+	setContext('validationByNodeId', () => validationByNodeId());
+	setContext('edgeValidationById', () => edgeValidationById());
 
 	// Load node definitions asynchronously
 	$effect(() => {

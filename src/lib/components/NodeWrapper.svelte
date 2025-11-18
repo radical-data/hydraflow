@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import type { SvelteMap } from 'svelte/reactivity';
 
 	import type { Issue } from '../engine/HydraEngine.js';
 	import type { InputValue, NodeDefinition } from '../types.js';
@@ -21,10 +20,12 @@
 
 	// Get node definitions from context (reactive)
 	const getNodeDefinitions = getContext<() => NodeDefinition[]>('nodeDefinitions');
-	const nodeValidationById =
-		getContext<SvelteMap<string, NodeValidationStatus>>('nodeValidationById');
+	const getValidationByNodeId =
+		getContext<() => Map<string, NodeValidationStatus>>('validationByNodeId');
 	const definition = $derived(getNodeDefinitions().find((d) => d.id === type));
-	const validationStatus = $derived(nodeValidationById?.get(id) ?? null);
+	const validationStatus = $derived(
+		getValidationByNodeId?.().get(id) ?? null
+	) as unknown as NodeValidationStatus | null;
 </script>
 
 {#if definition}

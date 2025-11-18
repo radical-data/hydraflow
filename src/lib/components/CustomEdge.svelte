@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { BaseEdge, type EdgeProps, EdgeReconnectAnchor, getBezierPath } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
-	import type { SvelteMap } from 'svelte/reactivity';
 
 	type EdgeValidationStatus = {
 		hasError: boolean;
@@ -10,9 +9,11 @@
 
 	let { id, sourceX, sourceY, targetX, targetY, selected }: EdgeProps = $props();
 
-	const edgeValidationById =
-		getContext<SvelteMap<string, EdgeValidationStatus>>('edgeValidationById');
-	const validationStatus = $derived(edgeValidationById?.get(id) ?? null);
+	const getEdgeValidationById =
+		getContext<() => Map<string, EdgeValidationStatus>>('edgeValidationById');
+	const validationStatus = $derived(
+		getEdgeValidationById?.().get(id) ?? null
+	) as unknown as EdgeValidationStatus | null;
 
 	const hasError = $derived(!!validationStatus?.hasError);
 	const hasWarning = $derived(!hasError && !!validationStatus?.hasWarning);
