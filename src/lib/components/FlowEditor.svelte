@@ -3,6 +3,7 @@
 	import { Background, Controls, MiniMap, Panel, SvelteFlow } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
 
+	import type { Issue } from '../engine/HydraEngine.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
 	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
 	import { getLayoutedElements } from '../utils/layout.js';
@@ -14,14 +15,27 @@
 		addNode,
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		addEdge,
-		updateNodeData
+		updateNodeData,
+		validationIssues = []
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
 		addEdge: (edge: Omit<IREdge, 'id'>) => string;
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
+		validationIssues?: Issue[];
 	}>();
+
+	type NodeValidationStatus = {
+		hasError: boolean;
+		hasWarning: boolean;
+		issues: Issue[];
+	};
+
+	type EdgeValidationStatus = {
+		hasError: boolean;
+		hasWarning: boolean;
+	};
 
 	const edgeTypes: EdgeTypes = {
 		default: CustomEdge
@@ -30,8 +44,45 @@
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
 	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
 
+	const validationByNodeId = $derived(() => {
+		// We intentionally build a fresh Map snapshot from validationIssues each time to avoid
+		// mutating reactive containers inside effects, which was causing update-at-update errors.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const map = new Map<string, NodeValidationStatus>();
+		for (const issue of validationIssues) {
+			if (!issue.nodeId) continue;
+			let status = map.get(issue.nodeId);
+			if (!status) {
+				status = { hasError: false, hasWarning: false, issues: [] };
+				map.set(issue.nodeId, status);
+			}
+			status.issues.push(issue);
+			if (issue.severity === 'error') status.hasError = true;
+			if (issue.severity === 'warning') status.hasWarning = true;
+		}
+		return map;
+	});
+
+	const edgeValidationById = $derived(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const map = new Map<string, EdgeValidationStatus>();
+		const nodeMap = validationByNodeId();
+		for (const edge of edges) {
+			const sourceStatus = nodeMap.get(edge.source);
+			const targetStatus = nodeMap.get(edge.target);
+			const hasError = !!sourceStatus?.hasError || !!targetStatus?.hasError;
+			const hasWarning = !hasError && (!!sourceStatus?.hasWarning || !!targetStatus?.hasWarning);
+			if (hasError || hasWarning) {
+				map.set(edge.id, { hasError, hasWarning });
+			}
+		}
+		return map;
+	});
+
 	setContext('updateNodeData', updateNodeData);
 	setContext('nodeDefinitions', () => nodeDefinitions); // Provide definitions via context
+	setContext('validationByNodeId', () => validationByNodeId());
+	setContext('edgeValidationById', () => edgeValidationById());
 
 	// Load node definitions asynchronously
 	$effect(() => {

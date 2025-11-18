@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 
+	import type { Issue } from '../engine/HydraEngine.js';
 	import type { InputValue, NodeDefinition } from '../types.js';
 	import NodeUI from './NodeUI.svelte';
 
@@ -11,13 +12,24 @@
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
+	type NodeValidationStatus = {
+		hasError: boolean;
+		hasWarning: boolean;
+		issues: Issue[];
+	};
+
 	// Get node definitions from context (reactive)
 	const getNodeDefinitions = getContext<() => NodeDefinition[]>('nodeDefinitions');
+	const getValidationByNodeId =
+		getContext<() => Map<string, NodeValidationStatus>>('validationByNodeId');
 	const definition = $derived(getNodeDefinitions().find((d) => d.id === type));
+	const validationStatus = $derived(
+		getValidationByNodeId?.().get(id) ?? null
+	) as unknown as NodeValidationStatus | null;
 </script>
 
 {#if definition}
-	<NodeUI nodeId={id} {definition} {data} {updateNodeData} />
+	<NodeUI nodeId={id} {definition} {data} {updateNodeData} {validationStatus} />
 {:else}
 	<div class="error-node">
 		<p>Unknown node type: {type}</p>

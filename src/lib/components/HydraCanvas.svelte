@@ -1,10 +1,18 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 
-	import { HydraEngine } from '../engine/HydraEngine.js';
+	import { HydraEngine, type Issue } from '../engine/HydraEngine.js';
 	import type { IREdge, IRNode } from '../types.js';
 
-	let { nodes = [], edges = [] } = $props<{ nodes?: IRNode[]; edges?: IREdge[] }>();
+	let {
+		nodes = [],
+		edges = [],
+		onValidationIssues
+	} = $props<{
+		nodes?: IRNode[];
+		edges?: IREdge[];
+		onValidationIssues?: (issues: Issue[]) => void;
+	}>();
 
 	let canvas: HTMLCanvasElement;
 	let engine: HydraEngine;
@@ -64,7 +72,8 @@
 
 	function execute() {
 		if (engine && isInitialized) {
-			engine.executeGraph(nodes, edges);
+			const issues = engine.executeGraph(nodes, edges);
+			onValidationIssues?.(issues);
 		}
 	}
 </script>

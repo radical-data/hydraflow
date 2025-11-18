@@ -1,6 +1,6 @@
 import type { IREdge, IRNode } from '../types.js';
 
-type Issue = { severity: 'error' | 'warning'; message: string; nodeId?: string };
+export type Issue = { severity: 'error' | 'warning'; message: string; nodeId?: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
 
@@ -317,10 +317,10 @@ export class HydraEngine {
 		return result;
 	}
 
-	executeGraph(nodes: IRNode[], edges: IREdge[]): void {
+	executeGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
 		if (!this.hydra || !this.isInitialized) {
 			console.warn('HydraEngine not initialized');
-			return;
+			return [];
 		}
 
 		const outputNodes = nodes.filter((node) => node.type === 'out');
@@ -374,6 +374,8 @@ export class HydraEngine {
 		if (allIssues.length > 0) {
 			console.error('Graph issues:', allIssues);
 		}
+
+		return allIssues;
 	}
 
 	start(): void {
