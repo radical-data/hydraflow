@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 
-	import { HydraEngine, type Issue } from '../engine/HydraEngine.js';
+	import type { Issue } from '../engine/HydraEngine.js';
 	import type { IREdge, IRNode } from '../types.js';
 
 	let {
@@ -15,7 +15,7 @@
 	}>();
 
 	let canvas: HTMLCanvasElement;
-	let engine: HydraEngine;
+	let engine: import('../engine/HydraEngine.js').HydraEngine;
 	let isInitialized = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -28,10 +28,6 @@
 		await engine.init(canvas);
 		engine.start();
 		isInitialized = true;
-
-		if (nodes.length > 0) {
-			execute();
-		}
 	});
 
 	onDestroy(() => {
@@ -43,39 +39,27 @@
 		}
 	});
 
-	const nodeData = $derived(
-		nodes.map((node: IRNode) => ({ id: node.id, type: node.type, data: node.data }))
-	);
-	const edgeData = $derived(
-		edges.map((edge: IREdge) => ({ id: edge.id, source: edge.source, target: edge.target }))
-	);
+	const EXECUTE_DEBOUNCE_MS = 50;
 
 	$effect(() => {
-		// Track nodeData and edgeData for reactivity
-		void nodeData;
-		void edgeData;
+		const ready = isInitialized && !!engine && nodes.length > 0;
+		const graphNodes = nodes;
+		const graphEdges = edges;
 
-		if (isInitialized && nodes.length > 0) {
-			debouncedExecute();
-		}
-	});
+		if (!ready) return;
 
-	function debouncedExecute() {
 		if (debounceTimer) {
 			clearTimeout(debounceTimer);
 		}
 
 		debounceTimer = setTimeout(() => {
-			execute();
-		}, 50);
-	}
+			if (!engine) return;
 
-	function execute() {
-		if (engine && isInitialized) {
-			const issues = engine.executeGraph(nodes, edges);
+			const issues = engine.executeGraph(graphNodes, graphEdges);
+
 			onValidationIssues?.(issues);
-		}
-	}
+		}, EXECUTE_DEBOUNCE_MS);
+	});
 </script>
 
 <canvas bind:this={canvas} class="absolute inset-0 w-full h-full" style="display: block;"></canvas>

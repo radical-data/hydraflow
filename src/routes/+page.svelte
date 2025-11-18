@@ -94,18 +94,6 @@
 		return id;
 	}
 
-	function addEdge(edge: Omit<IREdge, 'id'>): string {
-		const id = nanoid();
-		const newEdge: IREdge = {
-			...edge,
-			id,
-			sourceHandle: edge.sourceHandle,
-			targetHandle: edge.targetHandle
-		};
-		edges = [...edges, newEdge];
-		return id;
-	}
-
 	let validationIssues = $state.raw<Issue[]>([]);
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,9 +105,7 @@
 </script>
 
 <div class="w-full h-screen bg-black relative">
-	<!-- Fullscreen Canvas Background -->
 	<HydraCanvas {nodes} {edges} onValidationIssues={(issues) => (validationIssues = issues)} />
 
-	<!-- Flow Editor Overlay -->
-	<FlowEditor bind:nodes bind:edges {addNode} {addEdge} {updateNodeData} {validationIssues} />
+	<FlowEditor bind:nodes bind:edges {addNode} {updateNodeData} {validationIssues} />
 </div>
