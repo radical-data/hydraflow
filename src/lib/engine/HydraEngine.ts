@@ -127,7 +127,7 @@ export class HydraEngine {
 
 			this.isInitialized = true;
 		} catch (error) {
-			console.error('Failed to initialize HydraEngine:', error);
+			console.warn('Failed to initialize HydraEngine:', error);
 			throw error;
 		}
 	}
@@ -417,7 +417,6 @@ export class HydraEngine {
 					nodeId: outputNode.id,
 					outputIndex
 				});
-				console.error(`Error executing output ${outputIndex}:`, err);
 			}
 		}
 
