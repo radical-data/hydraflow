@@ -57,10 +57,6 @@
 
 			const issues = engine.executeGraph(graphNodes, graphEdges);
 
-			if (issues.length > 0) {
-				console.error('Graph issues:', issues);
-			}
-
 			onValidationIssues?.(issues);
 		}, EXECUTE_DEBOUNCE_MS);
 	});
