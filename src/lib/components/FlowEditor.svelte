@@ -2,7 +2,9 @@
 	import type { EdgeTypes } from '@xyflow/svelte';
 	import { Background, Controls, MiniMap, Panel, SvelteFlow } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
+	import type { Issue } from '../engine/HydraEngine.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
 	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
 	import { getLayoutedElements } from '../utils/layout.js';
@@ -14,14 +16,27 @@
 		addNode,
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		addEdge,
-		updateNodeData
+		updateNodeData,
+		validationIssues = []
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
 		addEdge: (edge: Omit<IREdge, 'id'>) => string;
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
+		validationIssues?: Issue[];
 	}>();
+
+	type NodeValidationStatus = {
+		hasError: boolean;
+		hasWarning: boolean;
+		issues: Issue[];
+	};
+
+	type EdgeValidationStatus = {
+		hasError: boolean;
+		hasWarning: boolean;
+	};
 
 	const edgeTypes: EdgeTypes = {
 		default: CustomEdge
@@ -30,8 +45,41 @@
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
 	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
 
+	const nodeValidationById = new SvelteMap<string, NodeValidationStatus>();
+	const edgeValidationById = new SvelteMap<string, EdgeValidationStatus>();
+
+	$effect(() => {
+		nodeValidationById.clear();
+		for (const issue of validationIssues) {
+			if (!issue.nodeId) continue;
+			let status = nodeValidationById.get(issue.nodeId);
+			if (!status) {
+				status = { hasError: false, hasWarning: false, issues: [] };
+				nodeValidationById.set(issue.nodeId, status);
+			}
+			status.issues.push(issue);
+			if (issue.severity === 'error') status.hasError = true;
+			if (issue.severity === 'warning') status.hasWarning = true;
+		}
+	});
+
+	$effect(() => {
+		edgeValidationById.clear();
+		for (const edge of edges) {
+			const sourceStatus = nodeValidationById.get(edge.source);
+			const targetStatus = nodeValidationById.get(edge.target);
+			const hasError = !!sourceStatus?.hasError || !!targetStatus?.hasError;
+			const hasWarning = !hasError && (!!sourceStatus?.hasWarning || !!targetStatus?.hasWarning);
+			if (hasError || hasWarning) {
+				edgeValidationById.set(edge.id, { hasError, hasWarning });
+			}
+		}
+	});
+
 	setContext('updateNodeData', updateNodeData);
 	setContext('nodeDefinitions', () => nodeDefinitions); // Provide definitions via context
+	setContext('nodeValidationById', nodeValidationById);
+	setContext('edgeValidationById', edgeValidationById);
 
 	// Load node definitions asynchronously
 	$effect(() => {

@@ -3,6 +3,7 @@
 
 	import FlowEditor from '$lib/components/FlowEditor.svelte';
 	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
+	import type { Issue } from '$lib/engine/HydraEngine.js';
 	import type { IREdge, IRNode } from '$lib/types.js';
 
 	let nodes = $state.raw<IRNode[]>([
@@ -105,6 +106,8 @@
 		return id;
 	}
 
+	let validationIssues = $state.raw<Issue[]>([]);
+
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	function updateNodeData(nodeId: string, data: Record<string, any>): void {
 		nodes = nodes.map((node) =>
@@ -115,8 +118,8 @@
 
 <div class="w-full h-screen bg-black relative">
 	<!-- Fullscreen Canvas Background -->
-	<HydraCanvas {nodes} {edges} />
+	<HydraCanvas {nodes} {edges} onValidationIssues={(issues) => (validationIssues = issues)} />
 
 	<!-- Flow Editor Overlay -->
-	<FlowEditor bind:nodes bind:edges {addNode} {addEdge} {updateNodeData} />
+	<FlowEditor bind:nodes bind:edges {addNode} {addEdge} {updateNodeData} {validationIssues} />
 </div>

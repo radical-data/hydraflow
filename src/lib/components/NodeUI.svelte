@@ -1,13 +1,19 @@
 <script lang="ts">
 	import { Handle, Position, useNodeConnections } from '@xyflow/svelte';
 
+	import type { Issue } from '../engine/HydraEngine.js';
 	import type { InputSchema, InputValue, NodeDefinition } from '../types.js';
 
-	let { nodeId, definition, data, updateNodeData } = $props<{
+	let { nodeId, definition, data, updateNodeData, validationStatus } = $props<{
 		nodeId: string;
 		definition: NodeDefinition;
 		data: Record<string, InputValue>;
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
+		validationStatus?: {
+			hasError: boolean;
+			hasWarning: boolean;
+			issues: Issue[];
+		} | null;
 	}>();
 
 	function handleChange(inputId: string, value: InputValue) {
@@ -43,6 +49,8 @@
 	// Create arrays of indices for each blocks
 	const inputIndices = $derived(Array.from({ length: handleConfig.inputs }, (_, i) => i));
 	const outputIndices = $derived(Array.from({ length: handleConfig.outputs }, (_, i) => i));
+	const hasError = $derived(!!validationStatus?.hasError);
+	const hasWarning = $derived(!hasError && !!validationStatus?.hasWarning);
 </script>
 
 {#if isEndNode}
@@ -56,14 +64,14 @@
 				isConnectable={inputsConnectable[i]}
 			/>
 		{/each}
-		<div class="node-container circular">
+		<div class="node-container circular" class:error={hasError} class:warning={hasWarning}>
 			<span class="circular-label">
 				{definition.label}
 			</span>
 		</div>
 	</div>
 {:else}
-	<div class="node-container">
+	<div class="node-container" class:error={hasError} class:warning={hasWarning}>
 		{#each inputIndices as i (i)}
 			{@const isMixer = definition.category === 'mixer'}
 			{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
@@ -78,7 +86,12 @@
 		{/each}
 
 		<div class="node-header">
-			{definition.label}
+			<span>{definition.label}</span>
+			{#if hasError}
+				<span class="validation-badge error-badge">!</span>
+			{:else if hasWarning}
+				<span class="validation-badge warning-badge">!</span>
+			{/if}
 		</div>
 		<div class="node-controls">
 			{#each definition.inputs as input (input.id)}
@@ -127,6 +140,19 @@
 				</div>
 			{/each}
 		</div>
+
+		{#if validationStatus && validationStatus.issues.length > 0}
+			<ul class="validation-messages">
+				{#each validationStatus.issues as issue, i (i)}
+					<li
+						class:message-error={issue.severity === 'error'}
+						class:message-warning={issue.severity === 'warning'}
+					>
+						{issue.message}
+					</li>
+				{/each}
+			</ul>
+		{/if}
 
 		{#each outputIndices as i (i)}
 			<Handle
@@ -180,6 +206,9 @@
 		font-size: 12px;
 		font-weight: 600;
 		margin: 0;
+		display: flex;
+		align-items: center;
+		gap: 6px;
 	}
 
 	.node-controls {
@@ -268,5 +297,64 @@
 
 	:global(.svelte-flow__handle-source) {
 		background: #3b82f6;
+	}
+
+	.node-container.error,
+	.node-container.circular.error {
+		border: 2px solid #ef4444;
+		box-shadow:
+			0 0 0 2px rgba(239, 68, 68, 0.3),
+			0 4px 20px rgba(0, 0, 0, 0.25);
+	}
+
+	.node-container.warning,
+	.node-container.circular.warning {
+		border: 2px solid #f59e0b;
+		box-shadow:
+			0 0 0 2px rgba(245, 158, 11, 0.3),
+			0 4px 20px rgba(0, 0, 0, 0.2);
+	}
+
+	.validation-badge {
+		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+		border-radius: 9999px;
+		font-size: 10px;
+		font-weight: 700;
+		color: white;
+	}
+
+	.validation-badge.error-badge {
+		background: #ef4444;
+	}
+
+	.validation-badge.warning-badge {
+		background: #f59e0b;
+	}
+
+	.validation-messages {
+		list-style: none;
+		margin: 0;
+		padding: 4px 12px 8px 12px;
+		border-top: 1px solid #f3f4f6;
+		background: #f9fafb;
+	}
+
+	.validation-messages li {
+		font-size: 10px;
+		line-height: 1.3;
+		margin-top: 2px;
+	}
+
+	.validation-messages li.message-error {
+		color: #b91c1c;
+	}
+
+	.validation-messages li.message-warning {
+		color: #92400e;
 	}
 </style>
