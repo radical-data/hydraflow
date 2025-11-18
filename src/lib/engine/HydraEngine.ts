@@ -1,6 +1,26 @@
 import type { IREdge, IRNode } from '../types.js';
 
-export type Issue = { severity: 'error' | 'warning'; message: string; nodeId?: string };
+export type IssueSeverity = 'error' | 'warning';
+
+export type IssueKind =
+	| 'CYCLE'
+	| 'NODE_NOT_FOUND'
+	| 'UNKNOWN_TRANSFORM'
+	| 'NODE_MISSING_INPUTS'
+	| 'NODE_EXTRA_INPUTS'
+	| 'OUTPUT_INDEX_OUT_OF_RANGE'
+	| 'OUTPUT_ARITY'
+	| 'RUNTIME_EXECUTION_ERROR';
+
+export type Issue = {
+	key: string;
+	severity: IssueSeverity;
+	kind: IssueKind;
+	message: string;
+	nodeId?: string;
+	edgeId?: string;
+	outputIndex?: number;
+};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
 
@@ -14,12 +34,25 @@ const ARITY: Record<TransformType, 0 | 1 | 2> = {
 	combineCoord: 2
 };
 
-// Helper to trim trailing undefined args to preserve positional holes
 const trimUndefTail = (xs: unknown[]) => {
 	const a = [...xs];
 	while (a.length && a[a.length - 1] === undefined) a.pop();
 	return a;
 };
+
+function makeIssueKey(kind: IssueKind, parts: Array<string | number | undefined>): string {
+	return [kind, ...parts.map((p) => (p ?? '').toString())].join(':');
+}
+
+function dedupeIssues(issues: Issue[]): Issue[] {
+	const byKey = new Map<string, Issue>();
+	for (const issue of issues) {
+		if (!byKey.has(issue.key)) {
+			byKey.set(issue.key, issue);
+		}
+	}
+	return Array.from(byKey.values());
+}
 
 export class HydraEngine {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,6 +132,35 @@ export class HydraEngine {
 		}
 	}
 
+	private validateNodeArity(node: IRNode, tType: TransformType, inputEdges: IREdge[]): Issue[] {
+		const issues: Issue[] = [];
+		void tType;
+		const want = this.arityByName.get(node.type);
+		const have = inputEdges.length;
+
+		if (want == null || have === want) return issues;
+
+		if (have < want) {
+			issues.push({
+				key: makeIssueKey('NODE_MISSING_INPUTS', [node.id, node.type, want, have]),
+				kind: 'NODE_MISSING_INPUTS',
+				severity: 'error',
+				message: `${node.type} expects ${want} input(s), found ${have}`,
+				nodeId: node.id
+			});
+		} else {
+			issues.push({
+				key: makeIssueKey('NODE_EXTRA_INPUTS', [node.id, node.type, want, have]),
+				kind: 'NODE_EXTRA_INPUTS',
+				severity: 'warning',
+				message: `${node.type} expects ${want} input(s), found ${have}`,
+				nodeId: node.id
+			});
+		}
+
+		return issues;
+	}
+
 	private buildChainValidated(
 		nodes: IRNode[],
 		edges: IREdge[],
@@ -108,10 +170,19 @@ export class HydraEngine {
 	): BuildResult {
 		// Check for cycles
 		if (stack.has(nodeId)) {
-			return {
+			const result: BuildResult = {
 				ok: false,
-				issues: [{ severity: 'error', message: 'Cycle detected', nodeId }]
-			} as BuildResult;
+				issues: [
+					{
+						key: makeIssueKey('CYCLE', [nodeId]),
+						kind: 'CYCLE',
+						severity: 'error',
+						message: `Cycle detected involving node ${nodeId}`,
+						nodeId
+					}
+				]
+			};
+			return result;
 		}
 
 		// Check memo cache
@@ -119,96 +190,52 @@ export class HydraEngine {
 			return memo.get(nodeId)!;
 		}
 
-		// Memoize node lookup
+		// Find node
 		const byId = new Map(nodes.map((n) => [n.id, n]));
 		const node = byId.get(nodeId);
 		if (!node) {
-			const result = {
+			const result: BuildResult = {
 				ok: false,
-				issues: [{ severity: 'error', message: `Node ${nodeId} not found` }]
-			} as BuildResult;
+				issues: [
+					{
+						key: makeIssueKey('NODE_NOT_FOUND', [nodeId]),
+						kind: 'NODE_NOT_FOUND',
+						severity: 'error',
+						message: `Node ${nodeId} not found`,
+						nodeId
+					}
+				]
+			};
 			memo.set(nodeId, result);
 			return result;
-		}
-
-		// Special case for output nodes
-		if (node.type === 'out') {
-			const inputEdges = edges.filter((e) => e.target === nodeId);
-			if (inputEdges.length !== 1) {
-				const result = {
-					ok: false,
-					issues: [
-						{
-							severity: 'error',
-							message: `Output expects exactly 1 input, found ${inputEdges.length}`,
-							nodeId
-						}
-					]
-				} as BuildResult;
-				memo.set(nodeId, result);
-				return result;
-			}
-
-			const outputIndex = Number(node.data?.outputIndex ?? 0);
-			if (
-				!Number.isInteger(outputIndex) ||
-				outputIndex < 0 ||
-				outputIndex >= this.hydra!.outputs.length
-			) {
-				const result = {
-					ok: false,
-					issues: [
-						{
-							severity: 'error',
-							message: `Output index ${outputIndex} out of range (0…${this.hydra!.outputs.length - 1})`,
-							nodeId
-						}
-					]
-				} as BuildResult;
-				memo.set(nodeId, result);
-				return result;
-			}
-
-			// Build the input chain and return it (don't call .out() here)
-			const inputResult = this.buildChainValidated(
-				nodes,
-				edges,
-				inputEdges[0].source,
-				new Set([...stack, nodeId]),
-				memo
-			);
-			memo.set(nodeId, inputResult);
-			return inputResult;
 		}
 
 		// Validate transform exists
 		const tType = this.typeByName.get(node.type);
 		if (!tType) {
-			const result = {
+			const result: BuildResult = {
 				ok: false,
-				issues: [{ severity: 'error', message: `Unknown transform "${node.type}"`, nodeId }]
-			} as BuildResult;
+				issues: [
+					{
+						key: makeIssueKey('UNKNOWN_TRANSFORM', [node.id, node.type]),
+						kind: 'UNKNOWN_TRANSFORM',
+						severity: 'error',
+						message: `Unknown transform "${node.type}"`,
+						nodeId: node.id
+					}
+				]
+			};
 			memo.set(nodeId, result);
 			return result;
 		}
 
 		// Validate arity
 		const inputEdges = edges.filter((e) => e.target === nodeId);
+		const issues: Issue[] = this.validateNodeArity(node, tType, inputEdges);
+
 		const want = this.arityByName.get(node.type);
-		const have = inputEdges.length;
-
-		const issues: Issue[] = [];
-		if (want != null && have !== want) {
-			issues.push({
-				severity: have < want ? 'error' : 'warning',
-				message: `${node.type} expects ${want} input(s), found ${have}`,
-				nodeId
-			});
-		}
-
-		// If we don't have enough inputs, stop here
-		if (want != null && have < want) {
-			const result = { ok: false, issues } as BuildResult;
+		if (want != null && inputEdges.length < want) {
+			const result: BuildResult = { ok: false, issues };
 			memo.set(nodeId, result);
 			return result;
 		}
@@ -227,21 +254,11 @@ export class HydraEngine {
 		let chain: any = null;
 
 		if (tType === 'src') {
-			// Start a new chain
 			const callArgs = trimUndefTail(rawArgs);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			chain = (this.generators as any)[node.type](...callArgs);
 		} else if (tType === 'coord' || tType === 'color') {
 			// Unary operation
-			if (inputEdges.length === 0) {
-				const result = {
-					ok: false,
-					issues: [...issues, { severity: 'error', message: `No input for ${node.type}`, nodeId }]
-				} as BuildResult;
-				memo.set(nodeId, result);
-				return result;
-			}
-
 			const inputResult = this.buildChainValidated(
 				nodes,
 				edges,
@@ -263,18 +280,6 @@ export class HydraEngine {
 			chain = (inputResult.chain as any)[node.type](...callArgs);
 		} else if (tType === 'combine' || tType === 'combineCoord') {
 			// Binary operation
-			if (inputEdges.length < 2) {
-				const result = {
-					ok: false,
-					issues: [
-						...issues,
-						{ severity: 'error', message: `Need 2 inputs for ${node.type}`, nodeId }
-					]
-				} as BuildResult;
-				memo.set(nodeId, result);
-				return result;
-			}
-
 			const sorted = inputEdges.sort((a, b) =>
 				(a.targetHandle ?? 'input-0').localeCompare(b.targetHandle ?? 'input-0')
 			);
@@ -317,15 +322,11 @@ export class HydraEngine {
 		return result;
 	}
 
-	executeGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
-		if (!this.hydra || !this.isInitialized) {
-			console.warn('HydraEngine not initialized');
-			return [];
-		}
+	validateGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
+		const issues: Issue[] = [];
+		const memo = new Map<string, BuildResult>();
 
 		const outputNodes = nodes.filter((node) => node.type === 'out');
-		const allIssues: Issue[] = [];
-
 		for (const outputNode of outputNodes) {
 			const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
 
@@ -333,43 +334,94 @@ export class HydraEngine {
 			if (
 				!Number.isInteger(outputIndex) ||
 				outputIndex < 0 ||
+				!this.hydra ||
 				outputIndex >= this.hydra.outputs.length
 			) {
-				allIssues.push({
+				issues.push({
+					key: makeIssueKey('OUTPUT_INDEX_OUT_OF_RANGE', [outputNode.id, outputIndex]),
+					kind: 'OUTPUT_INDEX_OUT_OF_RANGE',
 					severity: 'error',
-					message: `Output index ${outputIndex} out of range (0…${this.hydra.outputs.length - 1})`,
-					nodeId: outputNode.id
+					message: `Output index ${outputIndex} out of range (0…${
+						this.hydra ? this.hydra.outputs.length - 1 : -1
+					})`,
+					nodeId: outputNode.id,
+					outputIndex
 				});
 				continue;
 			}
 
-			// Validate exactly one input edge
+			// Validate exactly one input
 			const inEdges = edges.filter((e) => e.target === outputNode.id);
 			if (inEdges.length !== 1) {
-				allIssues.push({
+				issues.push({
+					key: makeIssueKey('OUTPUT_ARITY', [outputNode.id]),
+					kind: 'OUTPUT_ARITY',
 					severity: 'error',
-					message: `Output expects 1 input, found ${inEdges.length}`,
-					nodeId: outputNode.id
+					message: `Output expects exactly 1 input, found ${inEdges.length}`,
+					nodeId: outputNode.id,
+					outputIndex
 				});
 				continue;
 			}
-			const inputEdge = inEdges[0];
 
-			// Build the chain
+			const inputEdge = inEdges[0];
+			const result = this.buildChainValidated(nodes, edges, inputEdge.source, new Set(), memo);
+			if (!result.ok) {
+				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
+			}
+		}
+
+		return dedupeIssues(issues);
+	}
+
+	executeGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
+		if (!this.hydra || !this.isInitialized) {
+			console.warn('HydraEngine not initialized');
+			return [];
+		}
+
+		const validationIssues = this.validateGraph(nodes, edges);
+		const hasErrors = validationIssues.some((i) => i.severity === 'error');
+
+		if (hasErrors) {
+			return validationIssues;
+		}
+
+		const issues: Issue[] = [...validationIssues];
+		const outputNodes = nodes.filter((node) => node.type === 'out');
+
+		for (const outputNode of outputNodes) {
+			const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
+			const inEdges = edges.filter((e) => e.target === outputNode.id);
+
+			if (inEdges.length !== 1) continue;
+
+			const inputEdge = inEdges[0];
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
 			if (!result.ok) {
-				allIssues.push(...(result as { ok: false; issues: Issue[] }).issues);
+				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
 				continue;
 			}
 
 			try {
-				result.chain.out(this.hydra.outputs[outputIndex]);
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				(result.chain as any).out(this.hydra.outputs[outputIndex]);
 			} catch (err) {
+				const message =
+					err instanceof Error ? err.message : 'Unknown runtime error while executing graph';
+				issues.push({
+					key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [outputNode.id, outputIndex]),
+					kind: 'RUNTIME_EXECUTION_ERROR',
+					severity: 'error',
+					message,
+					nodeId: outputNode.id,
+					outputIndex
+				});
 				console.error(`Error executing output ${outputIndex}:`, err);
 			}
 		}
 
-		return allIssues;
+		return dedupeIssues(issues);
 	}
 
 	start(): void {
