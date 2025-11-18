@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { nanoid } from 'nanoid';
-	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
+
 	import FlowEditor from '$lib/components/FlowEditor.svelte';
-	import type { IRNode, IREdge } from '$lib/types.js';
+	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
+	import type { IREdge, IRNode } from '$lib/types.js';
 
 	let nodes = $state.raw<IRNode[]>([
 		{
@@ -105,6 +105,7 @@
 		return id;
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	function updateNodeData(nodeId: string, data: Record<string, any>): void {
 		nodes = nodes.map((node) =>
 			node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node

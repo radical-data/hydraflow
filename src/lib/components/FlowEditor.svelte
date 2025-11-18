@@ -1,24 +1,26 @@
 <script lang="ts">
-	import { SvelteFlow, Background, Controls, MiniMap, Panel } from '@xyflow/svelte';
-	import { getAllDefinitions } from '../nodes/registry.js';
-	import CustomNode from './CustomNode.svelte';
-	import CustomEdge from './CustomEdge.svelte';
-	import type { NodeDefinition, IRNode, IREdge } from '../types.js';
 	import type { EdgeTypes } from '@xyflow/svelte';
+	import { Background, Controls, MiniMap, Panel, SvelteFlow } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
-	import { getLayoutedElements } from '../utils/layout.js';
 
+	import { getAllDefinitions } from '../nodes/registry.js';
+	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
+	import { getLayoutedElements } from '../utils/layout.js';
+	import CustomEdge from './CustomEdge.svelte';
+	import CustomNode from './CustomNode.svelte';
 	let {
 		nodes = $bindable(),
 		edges = $bindable(),
 		addNode,
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		addEdge,
 		updateNodeData
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
 		addEdge: (edge: Omit<IREdge, 'id'>) => string;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
 	const edgeTypes: EdgeTypes = {
@@ -57,6 +59,7 @@
 					acc[input.id] = input.default;
 					return acc;
 				},
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				{} as Record<string, any>
 			),
 			position: { x, y }

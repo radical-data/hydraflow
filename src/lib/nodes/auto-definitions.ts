@@ -1,5 +1,6 @@
-import type { NodeDefinition, InputSchema } from '../types.js';
 import type { TransformDefinition } from 'hydra-ts';
+
+import type { InputSchema, NodeDefinition } from '../types.js';
 
 // Default ranges for common parameter names
 const PARAM_DEFAULTS: Record<

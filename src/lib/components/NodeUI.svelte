@@ -1,14 +1,16 @@
 <script lang="ts">
-	import type { NodeDefinition, InputSchema } from '../types.js';
 	import { Handle, Position, useNodeConnections } from '@xyflow/svelte';
+
+	import type { InputSchema, InputValue, NodeDefinition } from '../types.js';
 
 	let { nodeId, definition, data, updateNodeData } = $props<{
 		nodeId: string;
 		definition: NodeDefinition;
-		data: Record<string, any>;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		data: Record<string, InputValue>;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
-	function handleChange(inputId: string, value: any) {
+
+	function handleChange(inputId: string, value: InputValue) {
 		updateNodeData(nodeId, { [inputId]: value });
 	}
 	function getHandleConfig() {
@@ -37,11 +39,15 @@
 	const inputsConnectable = $derived(inputHandleConnections.map((c) => c.current.length === 0));
 
 	const isEndNode = $derived(definition.inputs.some((input: InputSchema) => input.type === 'end'));
+
+	// Create arrays of indices for each blocks
+	const inputIndices = $derived(Array.from({ length: handleConfig.inputs }, (_, i) => i));
+	const outputIndices = $derived(Array.from({ length: handleConfig.outputs }, (_, i) => i));
 </script>
 
 {#if isEndNode}
 	<div>
-		{#each Array(handleConfig.inputs) as _, i}
+		{#each inputIndices as i (i)}
 			<Handle
 				type="target"
 				position={Position.Top}
@@ -58,7 +64,7 @@
 	</div>
 {:else}
 	<div class="node-container">
-		{#each Array(handleConfig.inputs) as _, i}
+		{#each inputIndices as i (i)}
 			{@const isMixer = definition.category === 'mixer'}
 			{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
 			{@const topOffset = isMixer ? 20 : 20 + i * 30}
@@ -75,7 +81,7 @@
 			{definition.label}
 		</div>
 		<div class="node-controls">
-			{#each definition.inputs as input}
+			{#each definition.inputs as input (input.id)}
 				<div class="control-group">
 					<label for={input.id}>{input.label}</label>
 
@@ -104,7 +110,7 @@
 							onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
 							class="nodrag nopan nowheel"
 						>
-							{#each input.options ?? [] as option}
+							{#each input.options ?? [] as option (option.value)}
 								<option value={Number(option.value)}>{option.label}</option>
 							{/each}
 						</select>
@@ -122,7 +128,7 @@
 			{/each}
 		</div>
 
-		{#each Array(handleConfig.outputs) as _, i}
+		{#each outputIndices as i (i)}
 			<Handle
 				type="source"
 				position={Position.Bottom}

@@ -1,0 +1,93 @@
+diff --git a/src/compiler/compileWithContext.ts b/src/compiler/compileWithContext.ts
+index 0d2698bc88f6d14631b45a4b18d6ff8bbcbef6f8..36d11d6bc9cd203c1acfa303b10ae15891c43dad 100644
+--- a/src/compiler/compileWithContext.ts
++++ b/src/compiler/compileWithContext.ts
+@@ -78,7 +78,7 @@ export function compileWithContext(
+ 
+   return {
+     frag: frag,
+-    uniforms: { ...context.defaultUniforms, ...uniforms },
++    uniforms: { ...context.defaultUniforms, ...uniforms } as any,
+   };
+ }
+ 
+diff --git a/src/compiler/generateGlsl.ts b/src/compiler/generateGlsl.ts
+index 3e0d08287474822bfe8aaf25315905b2034b52b6..ab4102f1de184845e2d9d573dbf5505c54b94659 100644
+--- a/src/compiler/generateGlsl.ts
++++ b/src/compiler/generateGlsl.ts
+@@ -3,6 +3,10 @@ import { TransformApplication } from '../glsl/Glsl';
+ import { formatArguments, TypedArg } from './formatArguments';
+ import { ShaderParams } from './compileWithContext';
+ 
++function hasTransforms(value: unknown): value is { transforms: unknown } {
++  return typeof value === 'object' && value !== null && 'transforms' in value;
++}
++
+ export type GlslGenerator = (uv: string) => string;
+ 
+ export function generateGlsl(
+@@ -58,13 +62,15 @@ export function generateGlsl(
+         )}`;
+     } else if (transformApplication.transform.type === 'combine') {
+       // combining two generated shader strings (i.e. for blend, mult, add funtions)
++      const firstArg = typedArgs[0];
++      const firstArgValue = firstArg?.value;
+       f1 =
+-        typedArgs[0].value && typedArgs[0].value.transforms
++        firstArg && firstArgValue && hasTransforms(firstArgValue)
+           ? (uv: string) =>
+-              `${generateGlsl(typedArgs[0].value.transforms, shaderParams)(uv)}`
+-          : typedArgs[0].isUniform
+-          ? () => typedArgs[0].name
+-          : () => typedArgs[0].value;
++              `${generateGlsl(firstArgValue.transforms as any, shaderParams)(uv)}`
++          : firstArg?.isUniform
++          ? () => firstArg.name
++          : () => firstArg?.value;
+       fragColor = (uv) =>
+         `${shaderString(
+           `${f0(uv)}, ${f1(uv)}`,
+@@ -74,13 +80,15 @@ export function generateGlsl(
+         )}`;
+     } else if (transformApplication.transform.type === 'combineCoord') {
+       // combining two generated shader strings (i.e. for modulate functions)
++      const firstArg = typedArgs[0];
++      const firstArgValue = firstArg?.value;
+       f1 =
+-        typedArgs[0].value && typedArgs[0].value.transforms
++        firstArg && firstArgValue && hasTransforms(firstArgValue)
+           ? (uv: string) =>
+-              `${generateGlsl(typedArgs[0].value.transforms, shaderParams)(uv)}`
+-          : typedArgs[0].isUniform
+-          ? () => typedArgs[0].name
+-          : () => typedArgs[0].value;
++              `${generateGlsl(firstArgValue.transforms as any, shaderParams)(uv)}`
++          : firstArg?.isUniform
++          ? () => firstArg.name
++          : () => firstArg?.value;
+       fragColor = (uv) =>
+         `${f0(
+           `${shaderString(
+@@ -105,9 +113,9 @@ function shaderString(
+     .map((input) => {
+       if (input.isUniform) {
+         return input.name;
+-      } else if (input.value && input.value.transforms) {
++      } else if (hasTransforms(input.value)) {
+         // this by definition needs to be a generator, hence we start with 'st' as the initial value for generating the glsl fragment
+-        return `${generateGlsl(input.value.transforms, shaderParams)('st')}`;
++        return `${generateGlsl(input.value.transforms as any, shaderParams)('st')}`;
+       }
+       return input.value;
+     })
+diff --git a/src/lib/Screen.ts b/src/lib/Screen.ts
+index 7a04a936a5f231c1f50fa6dfd0d2f5da076967d4..4aaa6d8a3536c664661addad1881f6accab656ea 100755
+--- a/src/lib/Screen.ts
++++ b/src/lib/Screen.ts
+@@ -1,5 +1,5 @@
+ export function Screen(
+-  options?: DisplayMediaStreamConstraints,
++  options?: MediaStreamConstraints,
+ ): Promise<HTMLVideoElement> {
+   return new Promise(function (resolve, reject) {
+     navigator.mediaDevices

@@ -1,15 +1,14 @@
 <script lang="ts">
-	import NodeUI from './NodeUI.svelte';
 	import { getContext } from 'svelte';
-	import type { NodeDefinition } from '../types.js';
+
+	import type { InputValue, NodeDefinition } from '../types.js';
+	import NodeUI from './NodeUI.svelte';
 
 	let { id, type, data, updateNodeData } = $props<{
 		id: string;
 		type: string;
-		data: Record<string, any>;
-		selected?: boolean;
-		dragging?: boolean;
-		updateNodeData: (nodeId: string, data: Record<string, any>) => void;
+		data: Record<string, InputValue>;
+		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
 
 	// Get node definitions from context (reactive)

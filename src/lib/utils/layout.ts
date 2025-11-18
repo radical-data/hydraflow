@@ -1,5 +1,6 @@
 import Dagre from '@dagrejs/dagre';
-import type { IRNode, IREdge } from '../types.js';
+
+import type { IREdge, IRNode } from '../types.js';
 
 const nodeWidth = 180;
 const nodeHeight = 120;

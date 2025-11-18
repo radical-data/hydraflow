@@ -3,27 +3,43 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"packageManager": "pnpm@9.12.3",
+	"engines": {
+		"node": ">=20.19"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "husky && svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
+		"format:check": "prettier --check .",
 		"lint": "prettier --check . && eslint ."
+	},
+	"lint-staged": {
+		"*.{js,ts,svelte,json,md,css,yml,yaml}": [
+			"prettier --write"
+		],
+		"*.{js,ts,svelte}": [
+			"eslint --fix --max-warnings=0"
+		]
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
 		"@eslint/js": "^9.36.0",
-		"@sveltejs/adapter-auto": "^6.1.0",
+		"@sveltejs/adapter-netlify": "^4.3.0",
 		"@sveltejs/kit": "^2.43.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.0",
 		"@types/node": "^22",
 		"eslint": "^9.36.0",
 		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-simple-import-sort": "^12.0.0",
 		"eslint-plugin-svelte": "^3.12.4",
 		"globals": "^16.4.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^15.2.10",
 		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.4.0",
 		"svelte": "^5.39.5",
@@ -38,5 +54,10 @@
 		"hydra-ts": "^1.0.0",
 		"nanoid": "^5.1.6",
 		"regl": "^2.1.1"
+	},
+	"pnpm": {
+		"patchedDependencies": {
+			"hydra-ts@1.0.0": "patches/hydra-ts@1.0.0.patch"
+		}
 	}
 }

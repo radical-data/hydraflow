@@ -1,4 +1,4 @@
-import type { IRNode, IREdge } from '../types.js';
+import type { IREdge, IRNode } from '../types.js';
 
 type Issue = { severity: 'error' | 'warning'; message: string; nodeId?: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,6 +43,7 @@ export class HydraEngine {
 		this.canvas.width = window.innerWidth;
 		this.canvas.height = window.innerHeight;
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(this.regl as any)?.poll?.();
 
 		if (this.hydra) {
@@ -249,7 +250,10 @@ export class HydraEngine {
 				memo
 			);
 			if (!inputResult.ok) {
-				const result = { ok: false, issues: [...issues, ...inputResult.issues] } as BuildResult;
+				const result: BuildResult = {
+					ok: false,
+					issues: [...issues, ...(inputResult as { ok: false; issues: Issue[] }).issues]
+				};
 				memo.set(nodeId, result);
 				return result;
 			}
@@ -291,14 +295,14 @@ export class HydraEngine {
 			);
 
 			if (!aResult.ok || !bResult.ok) {
-				const result = {
+				const result: BuildResult = {
 					ok: false,
 					issues: [
 						...issues,
-						...(aResult.ok ? [] : aResult.issues),
-						...(bResult.ok ? [] : bResult.issues)
+						...(aResult.ok ? [] : (aResult as { ok: false; issues: Issue[] }).issues),
+						...(bResult.ok ? [] : (bResult as { ok: false; issues: Issue[] }).issues)
 					]
-				} as BuildResult;
+				};
 				memo.set(nodeId, result);
 				return result;
 			}
@@ -354,7 +358,7 @@ export class HydraEngine {
 			// Build the chain
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
 			if (!result.ok) {
-				allIssues.push(...result.issues);
+				allIssues.push(...(result as { ok: false; issues: Issue[] }).issues);
 				continue;
 			}
 
