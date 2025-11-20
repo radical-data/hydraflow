@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Handle, Position, useNodeConnections } from '@xyflow/svelte';
+	import { Handle, Position } from '@xyflow/svelte';
 
 	import type { Issue } from '../engine/HydraEngine.js';
 	import type { InputSchema, InputValue, NodeDefinition } from '../types.js';
@@ -42,14 +42,6 @@
 
 	const handleConfig = getHandleConfig();
 
-	// derive per-handle connectable flags: a handle is connectable if it has 0 connections
-	const inputHandleConnections = $derived(
-		Array.from({ length: handleConfig.inputs }, (_, i) =>
-			useNodeConnections({ handleType: 'target', handleId: `input-${i}` })
-		)
-	);
-	const inputsConnectable = $derived(inputHandleConnections.map((c) => c.current.length === 0));
-
 	const isEndNode = $derived(definition.inputs.some((input: InputSchema) => input.type === 'end'));
 
 	// Create arrays of indices for each blocks
@@ -69,7 +61,7 @@
 				position={Position.Top}
 				id="input-{i}"
 				style="top: -2px; left: 50%; transform: translateX(-50%); z-index: 10;"
-				isConnectable={inputsConnectable[i]}
+				isConnectable={true}
 			/>
 		{/each}
 		<div class="node-container circular" class:error={hasError} class:warning={hasWarning}>
@@ -89,7 +81,7 @@
 				position={Position.Top}
 				id="input-{i}"
 				style="top: {topOffset}px; left: {leftOffset}px;"
-				isConnectable={inputsConnectable[i]}
+				isConnectable={true}
 			/>
 		{/each}
 

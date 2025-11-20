@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EdgeTypes, Node } from '@xyflow/svelte';
+	import type { EdgeTypes, Node, OnBeforeConnect, OnBeforeReconnect } from '@xyflow/svelte';
 	import { Background, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
 	import { onDestroy, setContext } from 'svelte';
 
@@ -208,6 +208,32 @@
 	onDestroy(() => {
 		animator.stop();
 	});
+
+	function disconnectExistingTarget(
+		targetNodeId: string | null | undefined,
+		targetHandleId: string | null | undefined
+	): void {
+		if (!targetNodeId || !targetHandleId) return;
+
+		// Keep every edge that is NOT on this (target, targetHandle)
+		edges = edges.filter(
+			(e: IREdge) => e.target !== targetNodeId || e.targetHandle !== targetHandleId
+		);
+	}
+
+	function clearTargetHandle(conn: { target?: string | null; targetHandle?: string | null }) {
+		disconnectExistingTarget(conn.target ?? null, conn.targetHandle ?? null);
+	}
+
+	const handleBeforeConnect: OnBeforeConnect = (connection) => {
+		clearTargetHandle(connection);
+		return connection;
+	};
+
+	const handleBeforeReconnect: OnBeforeReconnect = (_oldEdge, newConnection) => {
+		clearTargetHandle(newConnection);
+		return newConnection;
+	};
 </script>
 
 <div class="flow-editor">
@@ -237,6 +263,8 @@
 				{edgeTypes}
 				fitView
 				nodesDraggable={false}
+				onbeforeconnect={handleBeforeConnect}
+				onbeforereconnect={handleBeforeReconnect}
 				class="flow-container"
 			>
 				<Background />
