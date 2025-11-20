@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EdgeTypes } from '@xyflow/svelte';
+	import type { EdgeTypes, OnBeforeConnect, OnBeforeReconnect } from '@xyflow/svelte';
 	import { Background, Controls, MiniMap, Panel, SvelteFlow } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
 
@@ -132,6 +132,32 @@
 		nodes = [...layouted.nodes];
 		edges = [...layouted.edges];
 	}
+
+	function disconnectExistingTarget(
+		targetNodeId: string | null | undefined,
+		targetHandleId: string | null | undefined
+	): void {
+		if (!targetNodeId || !targetHandleId) return;
+
+		// Keep every edge that is NOT on this (target, targetHandle)
+		edges = edges.filter(
+			(e: IREdge) => e.target !== targetNodeId || e.targetHandle !== targetHandleId
+		);
+	}
+
+	function clearTargetHandle(conn: { target?: string | null; targetHandle?: string | null }) {
+		disconnectExistingTarget(conn.target ?? null, conn.targetHandle ?? null);
+	}
+
+	const handleBeforeConnect: OnBeforeConnect = (connection) => {
+		clearTargetHandle(connection);
+		return connection;
+	};
+
+	const handleBeforeReconnect: OnBeforeReconnect = (_oldEdge, newConnection) => {
+		clearTargetHandle(newConnection);
+		return newConnection;
+	};
 </script>
 
 <div class="flow-editor">
@@ -154,7 +180,16 @@
 	</div>
 	<div class="flow-canvas">
 		{#if Object.keys(nodeTypes).length > 0}
-			<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} fitView class="flow-container">
+			<SvelteFlow
+				bind:nodes
+				bind:edges
+				{nodeTypes}
+				{edgeTypes}
+				fitView
+				onbeforeconnect={handleBeforeConnect}
+				onbeforereconnect={handleBeforeReconnect}
+				class="flow-container"
+			>
 				<Background />
 				<Controls />
 				<MiniMap />
