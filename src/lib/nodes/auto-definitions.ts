@@ -117,7 +117,7 @@ export async function generateAllDefinitions(): Promise<Map<string, NodeDefiniti
 	const definitions = new Map<string, NodeDefinition>();
 	const allTransforms = [...defaultGenerators, ...defaultModifiers];
 
-	const skipTransforms = new Set(['out', 'render']);
+	const skipTransforms = new Set(['src', 'out', 'render']);
 
 	for (const transform of allTransforms) {
 		if (skipTransforms.has(transform.name)) continue;
