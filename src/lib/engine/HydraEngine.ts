@@ -79,6 +79,9 @@ export class HydraEngine {
 				}
 			});
 
+			// Set canvas background to black
+			canvas.style.backgroundColor = '#000000';
+
 			this.hydra = new Hydra({
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				regl: this.regl as any,
