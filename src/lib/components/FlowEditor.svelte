@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { EdgeTypes } from '@xyflow/svelte';
 	import { Background, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
-	import { setContext } from 'svelte';
+	import { onDestroy, setContext } from 'svelte';
 
 	import type { Issue } from '../engine/HydraEngine.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
@@ -22,6 +22,9 @@
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 		validationIssues?: Issue[];
 	}>();
+
+	let displayNodes = $state.raw<IRNode[]>([]);
+	let isInitialized = $state(false);
 
 	type NodeValidationStatus = {
 		hasError: boolean;
@@ -128,6 +131,14 @@
 	}
 
 	const POSITION_TOLERANCE = 0.5;
+	const LAYOUT_DIRECTION = 'TB' as const;
+	const ANIMATION_DURATION = 250;
+
+	let isAnimating = false;
+	let animationFrameId: number | null = null;
+	const previousPositionsRef: {
+		current: Map<string, { x: number; y: number }> | null;
+	} = { current: null };
 
 	function shouldApplyAutoLayout(currentNodes: IRNode[], layoutedNodes: IRNode[]): boolean {
 		if (currentNodes.length !== layoutedNodes.length) {
@@ -160,12 +171,60 @@
 		return false;
 	}
 
+	function startLayoutAnimation(
+		fromById: Map<string, { x: number; y: number }>,
+		toById: Map<string, { x: number; y: number }>
+	) {
+		if (animationFrameId !== null) {
+			cancelAnimationFrame(animationFrameId);
+			animationFrameId = null;
+		}
+
+		isAnimating = true;
+		const start = performance.now();
+
+		const step = (now: number) => {
+			const elapsed = now - start;
+			const tRaw = elapsed / ANIMATION_DURATION;
+			const t = tRaw >= 1 ? 1 : tRaw;
+
+			const eased = t * (2 - t);
+
+			const nextDisplayNodes: IRNode[] = nodes.map((node) => {
+				const from = fromById.get(node.id) ?? { x: node.position.x, y: node.position.y };
+				const to = toById.get(node.id) ?? { x: node.position.x, y: node.position.y };
+
+				const x = from.x + (to.x - from.x) * eased;
+				const y = from.y + (to.y - from.y) * eased;
+
+				return {
+					...node,
+					position: { x, y },
+					sourcePosition: node.sourcePosition,
+					targetPosition: node.targetPosition
+				};
+			});
+
+			displayNodes = nextDisplayNodes;
+
+			if (t < 1 && isAnimating) {
+				animationFrameId = requestAnimationFrame(step);
+			} else {
+				isAnimating = false;
+				animationFrameId = null;
+				displayNodes = [...nodes];
+			}
+		};
+
+		animationFrameId = requestAnimationFrame(step);
+	}
+
 	$effect(() => {
 		if (nodes.length === 0) {
 			return;
 		}
 
-		const layouted = getLayoutedElements(nodes, edges);
+		const layouted = getLayoutedElements(nodes, edges, LAYOUT_DIRECTION);
 
 		if (!shouldApplyAutoLayout(nodes, layouted.nodes)) {
 			return;
@@ -173,6 +232,58 @@
 
 		nodes = [...layouted.nodes];
 		edges = [...layouted.edges];
+	});
+
+	$effect(() => {
+		if (nodes.length === 0) {
+			displayNodes = [];
+			isInitialized = true;
+			previousPositionsRef.current = null;
+			return;
+		}
+
+		if (!isInitialized) {
+			displayNodes = [...nodes];
+			isInitialized = true;
+			previousPositionsRef.current = new Map(
+				nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }])
+			);
+			return;
+		}
+
+		const fromById =
+			previousPositionsRef.current ??
+			new Map(nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]));
+		const toById = new Map(nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]));
+
+		let needsAnimation = false;
+		for (const node of nodes) {
+			const from = fromById.get(node.id);
+			const to = toById.get(node.id);
+			if (!to) continue;
+
+			if (!from || from.x !== to.x || from.y !== to.y) {
+				needsAnimation = true;
+				break;
+			}
+		}
+
+		previousPositionsRef.current = toById;
+
+		if (!needsAnimation) {
+			displayNodes = [...nodes];
+			return;
+		}
+
+		startLayoutAnimation(fromById, toById);
+	});
+
+	onDestroy(() => {
+		if (animationFrameId !== null) {
+			cancelAnimationFrame(animationFrameId);
+			animationFrameId = null;
+		}
+		isAnimating = false;
 	});
 </script>
 
@@ -197,7 +308,7 @@
 	<div class="flow-canvas">
 		{#if Object.keys(nodeTypes).length > 0}
 			<SvelteFlow
-				bind:nodes
+				bind:nodes={displayNodes}
 				bind:edges
 				{nodeTypes}
 				{edgeTypes}
