@@ -132,7 +132,7 @@
 	}
 
 	const POSITION_TOLERANCE = 0.5;
-	const LAYOUT_DIRECTION = 'TB' as const;
+	const LAYOUT_DIRECTION = 'TB';
 
 	const animator = createLayoutAnimator(250);
 
