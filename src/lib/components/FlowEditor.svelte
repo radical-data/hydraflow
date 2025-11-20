@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { EdgeTypes } from '@xyflow/svelte';
-	import { Background, Controls, MiniMap, Panel, SvelteFlow } from '@xyflow/svelte';
+	import { Background, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
 	import { setContext } from 'svelte';
 
 	import type { Issue } from '../engine/HydraEngine.js';
@@ -127,11 +127,53 @@
 		});
 	}
 
-	function onLayout(direction: 'TB' | 'LR') {
-		const layouted = getLayoutedElements(nodes, edges, direction);
+	const POSITION_TOLERANCE = 0.5;
+
+	function shouldApplyAutoLayout(currentNodes: IRNode[], layoutedNodes: IRNode[]): boolean {
+		if (currentNodes.length !== layoutedNodes.length) {
+			return true;
+		}
+
+		const layoutMap = new Map(layoutedNodes.map((node) => [node.id, node]));
+
+		for (const node of currentNodes) {
+			const layoutNode = layoutMap.get(node.id);
+			if (!layoutNode) {
+				return true;
+			}
+
+			const deltaX = Math.abs((node.position?.x ?? 0) - layoutNode.position.x);
+			const deltaY = Math.abs((node.position?.y ?? 0) - layoutNode.position.y);
+
+			if (deltaX > POSITION_TOLERANCE || deltaY > POSITION_TOLERANCE) {
+				return true;
+			}
+
+			if (
+				node.sourcePosition !== layoutNode.sourcePosition ||
+				node.targetPosition !== layoutNode.targetPosition
+			) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	$effect(() => {
+		if (nodes.length === 0) {
+			return;
+		}
+
+		const layouted = getLayoutedElements(nodes, edges);
+
+		if (!shouldApplyAutoLayout(nodes, layouted.nodes)) {
+			return;
+		}
+
 		nodes = [...layouted.nodes];
 		edges = [...layouted.edges];
-	}
+	});
 </script>
 
 <div class="flow-editor">
@@ -154,16 +196,18 @@
 	</div>
 	<div class="flow-canvas">
 		{#if Object.keys(nodeTypes).length > 0}
-			<SvelteFlow bind:nodes bind:edges {nodeTypes} {edgeTypes} fitView class="flow-container">
+			<SvelteFlow
+				bind:nodes
+				bind:edges
+				{nodeTypes}
+				{edgeTypes}
+				fitView
+				nodesDraggable={false}
+				class="flow-container"
+			>
 				<Background />
 				<Controls />
 				<MiniMap />
-				<Panel position="top-right">
-					<div class="layout-buttons">
-						<button onclick={() => onLayout('TB')} class="layout-btn"> Vertical </button>
-						<button onclick={() => onLayout('LR')} class="layout-btn"> Horizontal </button>
-					</div>
-				</Panel>
 			</SvelteFlow>
 		{:else}
 			<div class="loading-canvas">
@@ -233,33 +277,6 @@
 		font-size: 12px;
 		color: #666;
 		padding: 6px 12px;
-	}
-
-	.layout-buttons {
-		display: flex;
-		gap: 8px;
-		background: rgba(255, 255, 255, 0.95);
-		padding: 12px;
-		border-radius: 8px;
-		backdrop-filter: blur(4px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	.layout-btn {
-		padding: 8px 12px;
-		background: #4caf50;
-		color: white;
-		border: none;
-		border-radius: 6px;
-		cursor: pointer;
-		font-size: 12px;
-		font-weight: 600;
-		transition: all 0.2s;
-	}
-
-	.layout-btn:hover {
-		background: #45a049;
-		transform: translateY(-1px);
 	}
 
 	.flow-canvas {
