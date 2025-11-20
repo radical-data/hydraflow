@@ -8,8 +8,8 @@ const nodeHeight = 120;
 export function getLayoutedElements(
 	nodes: IRNode[],
 	edges: IREdge[],
-	direction: 'TB' | 'LR' = 'TB'
-) {
+	direction: 'TB' = 'TB'
+): { nodes: IRNode[]; edges: IREdge[] } {
 	const dagreGraph = new Dagre.graphlib.Graph();
 	dagreGraph.setDefaultEdgeLabel(() => ({}));
 
@@ -33,9 +33,8 @@ export function getLayoutedElements(
 
 	Dagre.layout(dagreGraph);
 
-	const layoutedNodes = nodes.map((node) => {
+	const layoutedNodes: IRNode[] = nodes.map((node) => {
 		const nodeWithPosition = dagreGraph.node(node.id);
-		const isHorizontal = direction === 'LR';
 
 		return {
 			...node,
@@ -43,8 +42,8 @@ export function getLayoutedElements(
 				x: nodeWithPosition.x - nodeWidth / 2,
 				y: nodeWithPosition.y - nodeHeight / 2
 			},
-			sourcePosition: isHorizontal ? 'right' : 'bottom',
-			targetPosition: isHorizontal ? 'left' : 'top'
+			sourcePosition: 'bottom' as const,
+			targetPosition: 'top' as const
 		};
 	});
 

@@ -37,6 +37,8 @@ export interface IRNode {
 	type: string;
 	data: Record<string, InputValue>;
 	position: { x: number; y: number };
+	sourcePosition?: 'left' | 'right' | 'top' | 'bottom';
+	targetPosition?: 'left' | 'right' | 'top' | 'bottom';
 }
 
 export interface IREdge {
