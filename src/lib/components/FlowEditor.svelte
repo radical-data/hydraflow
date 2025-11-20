@@ -240,7 +240,7 @@
 				class="flow-container"
 			>
 				<Background />
-				<Controls />
+				<Controls showLock={false} />
 				<MiniMap />
 			</SvelteFlow>
 		{:else}
