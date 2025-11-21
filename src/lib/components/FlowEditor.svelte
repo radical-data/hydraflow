@@ -5,6 +5,7 @@
 
 	import type { Issue } from '../engine/HydraEngine.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
+	import type { NodeCategory } from '../types.js';
 	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
 	import { getLayoutedElements } from '../utils/layout.js';
 	import { createLayoutAnimator } from '../utils/layoutAnimator.js';
@@ -234,6 +235,30 @@
 		clearTargetHandle(newConnection);
 		return newConnection;
 	};
+	// Group node definitions by category for dropdown organization
+	const nodesByCategory = $derived.by(() => {
+		const groups: Record<NodeCategory, NodeDefinition[]> = {
+			source: [],
+			modifier: [],
+			mixer: [],
+			output: []
+		};
+
+		for (const definition of nodeDefinitions) {
+			if (definition.category in groups) {
+				groups[definition.category as NodeCategory].push(definition);
+			}
+		}
+
+		return groups;
+	});
+
+	const categoryLabels: Record<NodeCategory, string> = {
+		source: 'Sources',
+		modifier: 'Modifiers',
+		mixer: 'Mixers',
+		output: 'Outputs'
+	};
 </script>
 
 <div class="flow-editor">
@@ -246,10 +271,31 @@
 			{#if nodeDefinitions.length === 0}
 				<div class="loading">Loading nodes...</div>
 			{:else}
-				{#each nodeDefinitions as definition (definition.id)}
-					<button onclick={() => addNodeToFlow(definition as NodeDefinition)} class="add-node-btn">
-						+ {(definition as NodeDefinition).label}
-					</button>
+				{#each Object.keys(nodesByCategory) as categoryKey (categoryKey)}
+					{@const category = categoryKey as NodeCategory}
+					{#if nodesByCategory[category] && nodesByCategory[category].length > 0}
+						<div class="node-dropdown">
+							<select
+								class="node-select"
+								onchange={(e) => {
+									const selectedId = (e.target as HTMLSelectElement).value;
+									if (selectedId) {
+										const definition = nodeDefinitions.find((d) => d.id === selectedId);
+										if (definition) {
+											addNodeToFlow(definition);
+										}
+										// Reset selection
+										(e.target as HTMLSelectElement).value = '';
+									}
+								}}
+							>
+								<option value="">{categoryLabels[category]}</option>
+								{#each nodesByCategory[category] ?? [] as definition (definition.id)}
+									<option value={definition.id}>{definition.label}</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
 				{/each}
 			{/if}
 		</div>
@@ -300,6 +346,7 @@
 		align-items: center;
 		gap: 16px;
 		backdrop-filter: blur(4px);
+		flex-wrap: wrap;
 	}
 
 	.toolbar h2 {
@@ -318,9 +365,33 @@
 		display: flex;
 		gap: 8px;
 		overflow-x: auto;
+		align-items: center;
+		flex: 1;
+		min-width: 0;
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: thin;
 	}
 
-	.add-node-btn {
+	.node-buttons::-webkit-scrollbar {
+		height: 4px;
+	}
+
+	.node-buttons::-webkit-scrollbar-track {
+		background: rgba(0, 0, 0, 0.1);
+		border-radius: 2px;
+	}
+
+	.node-buttons::-webkit-scrollbar-thumb {
+		background: rgba(0, 0, 0, 0.2);
+		border-radius: 2px;
+	}
+
+	.node-dropdown {
+		position: relative;
+		flex-shrink: 0;
+	}
+
+	.node-select {
 		padding: 6px 12px;
 		background: #2196f3;
 		color: white;
@@ -329,10 +400,32 @@
 		cursor: pointer;
 		font-size: 12px;
 		transition: background 0.2s;
+		min-width: 100px;
+		width: 100%;
+		max-width: 150px;
+		appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 8px center;
+		padding-right: 28px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.add-node-btn:hover {
-		background: #1976d2;
+	.node-select:hover {
+		background-color: #1976d2;
+	}
+
+	.node-select:focus {
+		outline: none;
+		box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
+	}
+
+	.node-select option {
+		background: white;
+		color: #333;
+		padding: 8px;
 	}
 
 	.loading {

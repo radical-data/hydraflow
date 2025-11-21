@@ -17,10 +17,12 @@ export interface OutputSchema {
 	type: 'color';
 }
 
+export type NodeCategory = 'source' | 'modifier' | 'mixer' | 'output';
+
 export interface NodeDefinition {
 	id: string;
 	label: string;
-	category: 'source' | 'modifier' | 'mixer' | 'output';
+	category: NodeCategory;
 	inputs: InputSchema[];
 	outputs: OutputSchema[];
 	build: (ctx: HydraBuildCtx, args: Record<string, InputValue>) => HydraChain;
