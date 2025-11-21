@@ -86,6 +86,19 @@ async function initializeRegistry(): Promise<void> {
 	);
 
 	nodeDefinitions.set('out', outDefinition);
+
+	nodeDefinitions.set(
+		'shift',
+		overrideDefinition(autoDefinitions.get('shift')!, {
+			label: 'shift',
+			inputs: [
+				{ id: 'r', label: 'R', type: 'number', default: 0.5, min: 0, max: 1, step: 0.01 },
+				{ id: 'g', label: 'G', type: 'number', default: 0, min: 0, max: 1, step: 0.01 },
+				{ id: 'b', label: 'B', type: 'number', default: 0, min: 0, max: 1, step: 0.01 },
+				{ id: 'a', label: 'A', type: 'number', default: 1 }
+			]
+		})
+	);
 }
 
 async function ensureInitialized(): Promise<void> {
