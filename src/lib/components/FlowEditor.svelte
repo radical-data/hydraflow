@@ -168,10 +168,6 @@
 <div class="flow-editor">
 	<div class="toolbar">
 		<div class="toolbar-left">
-			<h2>Hydra Flow</h2>
-			<div class="debug-info">
-				Nodes: {nodes.length} | Edges: {edges.length}
-			</div>
 			<div class="category-tabs">
 				{#each tabCategories as category (category)}
 					{@const groups = nodesByCategory()}
@@ -254,18 +250,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-	}
-
-	.toolbar h2 {
-		margin: 0;
-		font-size: 18px;
-		color: #333;
-	}
-
-	.debug-info {
-		font-size: 12px;
-		color: #666;
-		margin: 4px 0;
 	}
 
 	.node-buttons {
