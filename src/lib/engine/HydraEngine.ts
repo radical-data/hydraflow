@@ -1,4 +1,3 @@
-import { validateAndBuildCamNode } from '../nodes/definitions/cam.js';
 import type { IREdge, IRNode } from '../types.js';
 
 export type IssueSeverity = 'error' | 'warning';
@@ -41,6 +40,8 @@ const trimUndefTail = (xs: unknown[]) => {
 	return a;
 };
 
+const CAMERA_SOURCE_INDEX = 0;
+
 function makeIssueKey(kind: IssueKind, parts: Array<string | number | undefined>): string {
 	return [kind, ...parts.map((p) => (p ?? '').toString())].join(':');
 }
@@ -71,6 +72,9 @@ export class HydraEngine {
 	private typeByName = new Map<string, TransformType>();
 	private inputsByName = new Map<string, string[]>();
 
+	private isCameraInitialised = false;
+	private cameraInitError: string | null = null;
+
 	private onWindowResize(): void {
 		if (!this.canvas) return;
 
@@ -82,6 +86,28 @@ export class HydraEngine {
 
 		if (this.hydra) {
 			this.hydra.setResolution(this.canvas.width, this.canvas.height);
+		}
+	}
+
+	private initCameraSource(): void {
+		if (this.isCameraInitialised || this.cameraInitError || !this.hydra) return;
+
+		this.isCameraInitialised = true;
+
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const hydraAny = this.hydra as any;
+			const source = hydraAny.sources?.[CAMERA_SOURCE_INDEX];
+
+			if (!source || typeof source.initCam !== 'function') {
+				throw new Error('Hydra camera source not available');
+			}
+
+			source.initCam();
+		} catch (error) {
+			this.cameraInitError =
+				error instanceof Error ? error.message : 'Unknown error initialising camera source';
+			console.warn('Camera initialisation failed:', error);
 		}
 	}
 
@@ -119,7 +145,7 @@ export class HydraEngine {
 				regl: this.regl as any,
 				width: canvas.width,
 				height: canvas.height,
-				numOutputs: 1,
+				numOutputs: 4,
 				numSources: 4
 			});
 
@@ -211,14 +237,61 @@ export class HydraEngine {
 			return result;
 		}
 
-		// Handle camera node as special case
-		if (node.type === 'cam') {
-			const result = validateAndBuildCamNode(node, nodes, edges, nodeId, memo, {
-				hydra: this.hydra!,
-				generators: this.generators!,
-				executeGraph: this.executeGraph.bind(this)
-			});
-			return result ?? { ok: false, issues: [] };
+		if (node.type === 'camera') {
+			if (!this.hydra) {
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message: 'Hydra is not initialised; cannot use camera source',
+							nodeId: node.id
+						}
+					]
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			this.initCameraSource();
+
+			if (this.cameraInitError) {
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message: this.cameraInitError,
+							nodeId: node.id
+						}
+					]
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const gens = this.generators as any;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const hydraAny = this.hydra as any;
+			const enabled = node.data?.enabled !== false;
+
+			let chain: unknown;
+
+			if (!enabled) {
+				chain = gens.solid?.(0, 0, 0, 1);
+			} else {
+				const source = hydraAny.sources?.[CAMERA_SOURCE_INDEX];
+				chain = typeof gens.src === 'function' ? gens.src(source) : gens.solid?.(0, 0, 0, 1);
+			}
+
+			const result: BuildResult = { ok: true, chain };
+			memo.set(nodeId, result);
+			return result;
 		}
 
 		// Validate transform exists
@@ -339,10 +412,6 @@ export class HydraEngine {
 
 		const outputNodes = nodes.filter((node) => node.type === 'out');
 		for (const outputNode of outputNodes) {
-			// Skip validation for inactive nodes
-			if (outputNode.state === 'inactive') {
-				continue;
-			}
 			const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
 
 			// Validate output index range
@@ -380,21 +449,9 @@ export class HydraEngine {
 			}
 
 			const inputEdge = inEdges[0];
-			// Skip validation if source node is inactive
-			const sourceNode = nodes.find((n) => n.id === inputEdge.source);
-			if (sourceNode?.state === 'inactive') {
-				continue;
-			}
-
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source, new Set(), memo);
 			if (!result.ok) {
-				// Only add errors, not warnings for loading nodes
-				const errorIssues = (result as { ok: false; issues: Issue[] }).issues.filter(
-					(i) => i.severity === 'error'
-				);
-				if (errorIssues.length > 0) {
-					issues.push(...errorIssues);
-				}
+				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
 			}
 		}
 
@@ -424,21 +481,9 @@ export class HydraEngine {
 			if (inEdges.length !== 1) continue;
 
 			const inputEdge = inEdges[0];
-			// Skip execution if source node is inactive
-			const sourceNode = nodes.find((n) => n.id === inputEdge.source);
-			if (sourceNode?.state === 'inactive') {
-				continue;
-			}
-
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
 			if (!result.ok) {
-				// Only add errors, not warnings for loading nodes
-				const errorIssues = (result as { ok: false; issues: Issue[] }).issues.filter(
-					(i) => i.severity === 'error'
-				);
-				if (errorIssues.length > 0) {
-					issues.push(...errorIssues);
-				}
+				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
 				continue;
 			}
 
