@@ -93,57 +93,53 @@
 				<span class="validation-badge warning-badge">!</span>
 			{/if}
 		</div>
-		{#if definition.id === 'cam'}
-			<div class="node-controls" style="height: 30px;"></div>
-		{:else}
-			<div class="node-controls">
-				{#each definition.inputs as input (input.id)}
-					<div class="control-group">
-						<label for={input.id}>{input.label}</label>
+		<div class="node-controls">
+			{#each definition.inputs as input (input.id)}
+				<div class="control-group">
+					<label for={input.id}>{input.label}</label>
 
-						{#if input.type === 'number'}
-							{@const currentValue = data[input.id] ?? input.default}
-							<input
-								id={input.id}
-								type="range"
-								min={input.min ?? 0}
-								max={input.max ?? 1}
-								step={input.step ?? 0.01}
-								value={currentValue}
-								oninput={(e) =>
-									handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
-								class="nodrag nopan nowheel"
-							/>
-							<span class="value-display">
-								{currentValue.toFixed?.(2) ?? currentValue}
-							</span>
-						{:else if input.type === 'select'}
-							{@const currentValue = data[input.id] ?? input.default}
-							<select
-								disabled
-								id={input.id}
-								value={Number(currentValue)}
-								onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
-								class="nodrag nopan nowheel"
-							>
-								{#each input.options ?? [] as option (option.value)}
-									<option value={Number(option.value)}>{option.label}</option>
-								{/each}
-							</select>
-						{:else if input.type === 'boolean'}
-							{@const currentValue = data[input.id] ?? input.default}
-							<input
-								id={input.id}
-								type="checkbox"
-								checked={currentValue}
-								onchange={(e) => handleChange(input.id, (e.target as HTMLInputElement).checked)}
-								class="nodrag nopan nowheel"
-							/>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/if}
+					{#if input.type === 'number'}
+						{@const currentValue = data[input.id] ?? input.default}
+						<input
+							id={input.id}
+							type="range"
+							min={input.min ?? 0}
+							max={input.max ?? 1}
+							step={input.step ?? 0.01}
+							value={currentValue}
+							oninput={(e) =>
+								handleChange(input.id, parseFloat((e.target as HTMLInputElement).value))}
+							class="nodrag nopan nowheel"
+						/>
+						<span class="value-display">
+							{currentValue.toFixed?.(2) ?? currentValue}
+						</span>
+					{:else if input.type === 'select'}
+						{@const currentValue = data[input.id] ?? input.default}
+						<select
+							disabled
+							id={input.id}
+							value={Number(currentValue)}
+							onchange={(e) => handleChange(input.id, (e.target as HTMLSelectElement).value)}
+							class="nodrag nopan nowheel"
+						>
+							{#each input.options ?? [] as option (option.value)}
+								<option value={Number(option.value)}>{option.label}</option>
+							{/each}
+						</select>
+					{:else if input.type === 'boolean'}
+						{@const currentValue = data[input.id] ?? input.default}
+						<input
+							id={input.id}
+							type="checkbox"
+							checked={currentValue}
+							onchange={(e) => handleChange(input.id, (e.target as HTMLInputElement).checked)}
+							class="nodrag nopan nowheel"
+						/>
+					{/if}
+				</div>
+			{/each}
+		</div>
 
 		{#if issues.length > 0}
 			<ul class="validation-messages">
