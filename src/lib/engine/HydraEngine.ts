@@ -84,6 +84,42 @@ export class HydraEngine {
 		}
 	}
 
+	/**
+	 * Request camera permissions with less restrictive constraints to avoid OverconstrainedError
+	 * Uses 'ideal' instead of 'exact' for deviceId to be more flexible
+	 */
+	private async requestCameraPermission(deviceId: number): Promise<void> {
+		if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+			throw new Error('Camera API not available');
+		}
+
+		// First, enumerate devices to get available cameras
+		const devices = await navigator.mediaDevices.enumerateDevices();
+		const cameras = devices.filter((device) => device.kind === 'videoinput');
+
+		// Build constraints with 'ideal' instead of 'exact' to avoid OverconstrainedError
+		const constraints: MediaStreamConstraints = {
+			audio: false,
+			video: cameras[deviceId]
+				? {
+						deviceId: {
+							ideal: cameras[deviceId].deviceId
+						},
+						width: { ideal: 1280 / 2 },
+						height: { ideal: 720 / 2 }
+					}
+				: {
+						width: { ideal: 1280 / 2 },
+						height: { ideal: 720 / 2 }
+					}
+		};
+
+		// Request permission with less restrictive constraints
+		const stream = await navigator.mediaDevices.getUserMedia(constraints);
+		// Stop the stream immediately - we just needed permission
+		stream.getTracks().forEach((track) => track.stop());
+	}
+
 	async init(canvas: HTMLCanvasElement): Promise<void> {
 		this.canvas = canvas;
 
@@ -118,7 +154,7 @@ export class HydraEngine {
 				regl: this.regl as any,
 				width: canvas.width,
 				height: canvas.height,
-				numOutputs: 4,
+				numOutputs: 1,
 				numSources: 4
 			});
 
@@ -210,6 +246,103 @@ export class HydraEngine {
 			return result;
 		}
 
+		// Handle custom 'cam' node
+		if (node.type === 'cam' && this.hydra) {
+			// Check node state - skip if inactive
+			if (node.state === 'inactive') {
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'warning',
+							message: 'Camera node is inactive',
+							nodeId: node.id
+						}
+					]
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			// Initialize node state if not set
+			if (!node.state) {
+				node.state = 'inactive';
+			}
+
+			// Try to build the cam node
+			try {
+				const sourceIndex = 0;
+				const source = this.hydra.sources[sourceIndex];
+				const cameraIndex = Number(node.data?.source_camera ?? 0);
+
+				// Check if source is ready - need both src (video element) and valid texture
+				const isReady = source && source.src;
+
+				if (isReady) {
+					// Source is ready, wrap texture in src() generator
+					// src() expects a texture (sampler2D), not a Source object
+					node.state = 'active';
+					const chain = this.generators.src(source);
+					const result = { ok: true, chain } as BuildResult;
+					memo.set(nodeId, result);
+
+					return result;
+				} else {
+					// Trigger camera initialization if not already loading
+					if (node.state === 'inactive' && source && typeof source.initCam === 'function') {
+						// Request camera permissions first with less restrictive constraints
+						// This helps avoid OverconstrainedError by using 'ideal' instead of 'exact'
+						this.requestCameraPermission(cameraIndex)
+							.then(() => {
+								// Permissions granted, now initialize camera
+								// Note: initCam will still use exact constraints, but permissions are already granted
+								source.initCam(cameraIndex);
+							})
+							.catch((err) => {
+								console.error('Camera permission denied or error:', err);
+								// Set state back to inactive so user can retry
+								node.state = 'inactive';
+							});
+						node.state = 'loading';
+					}
+
+					// Still loading
+					const result: BuildResult = {
+						ok: false,
+						issues: [
+							{
+								key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
+								kind: 'RUNTIME_EXECUTION_ERROR',
+								severity: 'warning',
+								message: 'Camera is loading...',
+								nodeId: node.id
+							}
+						]
+					};
+					memo.set(nodeId, result);
+					return result;
+				}
+			} catch (err) {
+				const message = err instanceof Error ? err.message : 'Unknown error building cam node';
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message: `Error building cam: ${message}`,
+							nodeId: node.id
+						}
+					]
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+		}
+
 		// Validate transform exists
 		const tType = this.typeByName.get(node.type);
 		if (!tType) {
@@ -257,6 +390,7 @@ export class HydraEngine {
 			const callArgs = trimUndefTail(rawArgs);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			chain = (this.generators as any)[node.type](...callArgs);
+			console.log('chain', chain);
 		} else if (tType === 'coord' || tType === 'color') {
 			// Unary operation
 			const inputResult = this.buildChainValidated(
@@ -328,6 +462,10 @@ export class HydraEngine {
 
 		const outputNodes = nodes.filter((node) => node.type === 'out');
 		for (const outputNode of outputNodes) {
+			// Skip validation for inactive nodes
+			if (outputNode.state === 'inactive') {
+				continue;
+			}
 			const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
 
 			// Validate output index range
@@ -365,9 +503,21 @@ export class HydraEngine {
 			}
 
 			const inputEdge = inEdges[0];
+			// Skip validation if source node is inactive
+			const sourceNode = nodes.find((n) => n.id === inputEdge.source);
+			if (sourceNode?.state === 'inactive') {
+				continue;
+			}
+
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source, new Set(), memo);
 			if (!result.ok) {
-				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
+				// Only add errors, not warnings for loading nodes
+				const errorIssues = (result as { ok: false; issues: Issue[] }).issues.filter(
+					(i) => i.severity === 'error'
+				);
+				if (errorIssues.length > 0) {
+					issues.push(...errorIssues);
+				}
 			}
 		}
 
@@ -397,9 +547,22 @@ export class HydraEngine {
 			if (inEdges.length !== 1) continue;
 
 			const inputEdge = inEdges[0];
+			// Skip execution if source node is inactive
+			const sourceNode = nodes.find((n) => n.id === inputEdge.source);
+			if (sourceNode?.state === 'inactive') {
+				continue;
+			}
+
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
+			console.log(result);
 			if (!result.ok) {
-				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
+				// Only add errors, not warnings for loading nodes
+				const errorIssues = (result as { ok: false; issues: Issue[] }).issues.filter(
+					(i) => i.severity === 'error'
+				);
+				if (errorIssues.length > 0) {
+					issues.push(...errorIssues);
+				}
 				continue;
 			}
 

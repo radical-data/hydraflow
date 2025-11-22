@@ -1,7 +1,7 @@
 import type { NodeDefinition } from '../types.js';
 import { generateAllDefinitions, overrideDefinition } from './auto-definitions.js';
+import { camDefinition } from './definitions/cam.js';
 import { outDefinition } from './definitions/out.js';
-
 let nodeDefinitions: Map<string, NodeDefinition> | null = null;
 let initPromise: Promise<void> | null = null;
 
@@ -11,6 +11,7 @@ async function initializeRegistry(): Promise<void> {
 	const autoDefinitions = await generateAllDefinitions();
 	nodeDefinitions = new Map<string, NodeDefinition>(autoDefinitions);
 
+	nodeDefinitions.set('cam', camDefinition);
 	// Override nodes with custom UX
 	nodeDefinitions.set(
 		'osc',
