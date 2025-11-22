@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   hydra-ts@1.0.0:
-    hash: hqpvf5kcqo5jwlexmlszhq22ii
+    hash: 74kbwnkr7osdza5mftzb3zfwym
     path: patches/hydra-ts@1.0.0.patch
 
 importers:
@@ -21,7 +21,7 @@ importers:
         version: 1.4.0(svelte@5.41.1)
       hydra-ts:
         specifier: ^1.0.0
-        version: 1.0.0(patch_hash=hqpvf5kcqo5jwlexmlszhq22ii)
+        version: 1.0.0(patch_hash=74kbwnkr7osdza5mftzb3zfwym)
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
@@ -2523,7 +2523,7 @@ snapshots:
 
   husky@9.1.7: {}
 
-  hydra-ts@1.0.0(patch_hash=hqpvf5kcqo5jwlexmlszhq22ii):
+  hydra-ts@1.0.0(patch_hash=74kbwnkr7osdza5mftzb3zfwym):
     dependencies:
       regl: 1.7.0
 

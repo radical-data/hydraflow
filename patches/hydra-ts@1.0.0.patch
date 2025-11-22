@@ -91,16 +91,3 @@ index 7a04a936a5f231c1f50fa6dfd0d2f5da076967d4..4aaa6d8a3536c664661addad1881f6ac
  ): Promise<HTMLVideoElement> {
    return new Promise(function (resolve, reject) {
      navigator.mediaDevices
-diff --git a/src/lib/Webcam.ts b/src/lib/Webcam.ts
-index a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0..b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u 100644
---- a/src/lib/Webcam.ts
-+++ b/src/lib/Webcam.ts
-@@ -13,7 +13,7 @@ export function Webcam(deviceId: number): Promise<HTMLVideoElement> {
-       if (cameras[deviceId]) {
-         constraints['video'] = {
-           deviceId: {
--            exact: cameras[deviceId].deviceId,
-+            ideal: cameras[deviceId].deviceId,
-           },
-         };
-       }
