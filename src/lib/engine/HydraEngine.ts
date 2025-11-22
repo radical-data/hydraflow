@@ -299,7 +299,24 @@ export class HydraEngine {
 							.then(() => {
 								source.initCam(cameraIndex);
 								//TODO: Ideally node build should be called here;
-								//TODO: should be forcing node chain execution
+
+								// Poll for source.src to be defined, then execute graph
+								const maxAttempts = 30;
+								const pollInterval = 200; // Check every 200ms
+								let attempts = 0;
+
+								const checkInterval = setInterval(() => {
+									attempts++;
+
+									if (source.src) {
+										clearInterval(checkInterval);
+										this.executeGraph(nodes, edges);
+									} else if (attempts >= maxAttempts) {
+										clearInterval(checkInterval);
+										console.warn('Timeout waiting for camera source to be ready');
+										node.state = 'inactive';
+									}
+								}, pollInterval);
 							})
 							.catch((err) => {
 								console.error('Camera permission denied or error:', err);
@@ -525,6 +542,7 @@ export class HydraEngine {
 	}
 
 	executeGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
+		console.log('executeGraph');
 		if (!this.hydra || !this.isInitialized) {
 			console.warn('HydraEngine not initialized');
 			return [];
