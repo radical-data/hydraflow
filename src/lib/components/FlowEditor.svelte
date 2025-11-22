@@ -41,6 +41,37 @@
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
 	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
 
+	const categories: NodeDefinition['category'][] = ['source', 'modifier', 'mixer', 'output'];
+
+	const categoryLabels: Record<NodeDefinition['category'], string> = {
+		source: 'Sources',
+		modifier: 'Modifiers',
+		mixer: 'Mixers',
+		output: 'Outputs'
+	};
+
+	const tabCategories: NodeDefinition['category'][] = ['source', 'modifier', 'mixer', 'output'];
+	let activeCategory = $state<NodeDefinition['category']>('source');
+
+	const nodesByCategory = $derived(() => {
+		const groups: Record<NodeDefinition['category'], NodeDefinition[]> = {
+			source: [],
+			modifier: [],
+			mixer: [],
+			output: []
+		};
+
+		for (const def of nodeDefinitions) {
+			groups[def.category].push(def);
+		}
+
+		for (const cat of categories) {
+			groups[cat].sort((a, b) => a.label.localeCompare(b.label));
+		}
+
+		return groups;
+	});
+
 	const validationByNodeId = $derived(() => {
 		// We intentionally build a fresh Map snapshot from validationIssues each time to avoid
 		// mutating reactive containers inside effects, which was causing update-at-update errors.
@@ -136,20 +167,44 @@
 
 <div class="flow-editor">
 	<div class="toolbar">
-		<h2>Hydra Flow</h2>
-		<div class="debug-info">
-			Nodes: {nodes.length} | Edges: {edges.length}
-		</div>
-		<div class="node-buttons">
-			{#if nodeDefinitions.length === 0}
-				<div class="loading">Loading nodes...</div>
-			{:else}
-				{#each nodeDefinitions as definition (definition.id)}
-					<button onclick={() => addNodeToFlow(definition as NodeDefinition)} class="add-node-btn">
-						+ {(definition as NodeDefinition).label}
+		<div class="toolbar-left">
+			<h2>Hydra Flow</h2>
+			<div class="debug-info">
+				Nodes: {nodes.length} | Edges: {edges.length}
+			</div>
+			<div class="category-tabs">
+				{#each tabCategories as category (category)}
+					{@const groups = nodesByCategory()}
+					<button
+						class="category-tab"
+						class:active={activeCategory === category}
+						onclick={() => (activeCategory = category)}
+					>
+						{categoryLabels[category]}
+						<span class="tab-count">
+							({groups[category].length})
+						</span>
 					</button>
 				{/each}
-			{/if}
+			</div>
+			<div class="node-buttons">
+				{#if nodeDefinitions.length === 0}
+					<div class="loading">Loading nodes...</div>
+				{:else}
+					{@const groups = nodesByCategory()}
+					<div class="node-buttons-inner">
+						{#each groups[activeCategory] as definition (definition.id)}
+							<button
+								onclick={() => addNodeToFlow(definition as NodeDefinition)}
+								class="add-node-btn"
+								class:output-btn={activeCategory === 'output'}
+							>
+								+ {(definition as NodeDefinition).label}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 	<div class="flow-canvas">
@@ -188,12 +243,17 @@
 
 	.toolbar {
 		background: rgba(255, 255, 255, 0.9);
-		padding: 12px;
+		padding: 8px 12px;
 		border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 		display: flex;
 		align-items: center;
-		gap: 16px;
 		backdrop-filter: blur(4px);
+	}
+
+	.toolbar-left {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
 	}
 
 	.toolbar h2 {
@@ -209,24 +269,72 @@
 	}
 
 	.node-buttons {
-		display: flex;
-		gap: 8px;
 		overflow-x: auto;
+		overflow-y: hidden;
+	}
+
+	.node-buttons-inner {
+		display: flex;
+		flex-wrap: nowrap;
+		gap: 6px;
+		white-space: nowrap;
+		padding-top: 2px;
+	}
+
+	.category-tabs {
+		display: flex;
+		flex-wrap: nowrap;
+		gap: 6px;
+		margin-top: 2px;
+	}
+
+	.category-tab {
+		padding: 4px 8px;
+		border-radius: 9999px;
+		border: 1px solid #e5e7eb;
+		background: #f9fafb;
+		font-size: 11px;
+		font-weight: 600;
+		color: #4b5563;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.category-tab.active {
+		background: #ec4899;
+		border-color: #ec4899;
+		color: white;
+	}
+
+	.tab-count {
+		font-weight: 400;
+		opacity: 0.8;
 	}
 
 	.add-node-btn {
-		padding: 6px 12px;
+		padding: 4px 10px;
 		background: #2196f3;
 		color: white;
 		border: none;
 		border-radius: 4px;
 		cursor: pointer;
-		font-size: 12px;
+		font-size: 11px;
+		font-weight: 600;
 		transition: background 0.2s;
 	}
 
 	.add-node-btn:hover {
 		background: #1976d2;
+	}
+
+	.output-btn {
+		background: #10b981;
+	}
+
+	.output-btn:hover {
+		background: #059669;
 	}
 
 	.loading {
