@@ -1,5 +1,5 @@
 import type { Issue, IssueKind } from '../../engine/HydraEngine.js';
-import type { IREdge,IRNode, NodeDefinition } from '../../types.js';
+import type { IREdge, IRNode, NodeDefinition } from '../../types.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
@@ -55,7 +55,7 @@ interface CamBuildContext {
 /**
  * Builds a camera node chain, handling camera initialization and state management
  */
-export function buildCamNode(
+export function validateAndBuildCamNode(
 	node: IRNode,
 	nodes: IRNode[],
 	edges: IREdge[],

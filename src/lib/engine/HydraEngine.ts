@@ -1,4 +1,4 @@
-import { buildCamNode } from '../nodes/definitions/cam.js';
+import { validateAndBuildCamNode } from '../nodes/definitions/cam.js';
 import type { IREdge, IRNode } from '../types.js';
 
 export type IssueSeverity = 'error' | 'warning';
@@ -213,7 +213,7 @@ export class HydraEngine {
 
 		// Handle camera node as special case
 		if (node.type === 'cam') {
-			const result = buildCamNode(node, nodes, edges, nodeId, memo, {
+			const result = validateAndBuildCamNode(node, nodes, edges, nodeId, memo, {
 				hydra: this.hydra!,
 				generators: this.generators!,
 				executeGraph: this.executeGraph.bind(this)
