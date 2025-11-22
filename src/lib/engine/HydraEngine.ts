@@ -554,7 +554,6 @@ export class HydraEngine {
 			}
 
 			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
-			console.log(result);
 			if (!result.ok) {
 				// Only add errors, not warnings for loading nodes
 				const errorIssues = (result as { ok: false; issues: Issue[] }).issues.filter(
