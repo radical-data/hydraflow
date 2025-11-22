@@ -250,11 +250,22 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		flex: 1;
+		width: 100%;
+		min-width: 0;
 	}
 
 	.node-buttons {
+		width: 100%;
+		max-width: 100%;
 		overflow-x: auto;
 		overflow-y: hidden;
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: none;
+	}
+
+	.node-buttons::-webkit-scrollbar {
+		display: none;
 	}
 
 	.node-buttons-inner {
@@ -270,6 +281,12 @@
 		flex-wrap: nowrap;
 		gap: 6px;
 		margin-top: 2px;
+		width: 100%;
+		max-width: 100%;
+		min-width: 0;
+		overflow-x: auto;
+		overflow-y: hidden;
+		-webkit-overflow-scrolling: touch;
 	}
 
 	.category-tab {
