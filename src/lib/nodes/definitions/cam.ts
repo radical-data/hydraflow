@@ -11,23 +11,20 @@ export const camDefinition: NodeDefinition = {
 			label: 'Source Camera',
 			type: 'select',
 			default: 0,
-			options: [{ value: 0, label: 'cam 0' }] //TODO: this should be a list of all browsers availables cameras
+			options: [{ value: 0, label: 'cam 0' }]
+			//TODO: this should be a list of all browsers availables cameras L92. Hydra Engine
 		}
 	],
 	outputs: [],
-	build: (ctx, args) => {
-		const { sources } = ctx;
-		const cameraIndex = Number(args.source_camera) || 0;
-		const sourceIndex = 0; // Use source 0 for camera
-
-		// Step 1: Initialize camera on the source (async, fire and forget)
-		const source = sources[sourceIndex];
-
-		if (source && typeof source.initCam === 'function') {
-			// Trigger camera initialization asynchronously
-			// The node state will be updated when the camera is ready
-			// initCam doesn't return a promise, it handles errors internally
-			source.initCam(cameraIndex);
-		}
+	build: () => {
+		//TODO: Move build definition here, currently in Hydra Engine
 	}
 };
+
+/**
+ * we need:
+ *  init -> initialize node with 'inactive', initialize camera
+ *  update -> check weather camera and source are correctly initialized.
+ *  build -> creates the node once camera and source as correctly initialize
+ *
+ */

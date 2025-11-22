@@ -246,8 +246,13 @@ export class HydraEngine {
 			return result;
 		}
 
-		// Handle custom 'cam' node
-		if (node.type === 'cam' && this.hydra) {
+		/**
+		 * SKETCHY VERSION OF HANDLING CAMERA AS SPECIAL CASE
+		 * Current status:
+		 * - node is being created
+		 * - need to reload the graph to make it work (click on edge/validate the graph again)
+		 */
+		if (node.type === 'cam') {
 			// Check node state - skip if inactive
 			if (node.state === 'inactive') {
 				const result: BuildResult = {
@@ -271,18 +276,14 @@ export class HydraEngine {
 				node.state = 'inactive';
 			}
 
-			// Try to build the cam node
 			try {
+				//TODO: this is basically the build of the node definition
 				const sourceIndex = 0;
 				const source = this.hydra.sources[sourceIndex];
 				const cameraIndex = Number(node.data?.source_camera ?? 0);
 
-				// Check if source is ready - need both src (video element) and valid texture
-				const isReady = source && source.src;
-
-				if (isReady) {
-					// Source is ready, wrap texture in src() generator
-					// src() expects a texture (sampler2D), not a Source object
+				if (source && source.src) {
+					// Checks that src is ready and video is ready (source.src)
 					node.state = 'active';
 					const chain = this.generators.src(source);
 					const result = { ok: true, chain } as BuildResult;
@@ -296,13 +297,12 @@ export class HydraEngine {
 						// This helps avoid OverconstrainedError by using 'ideal' instead of 'exact'
 						this.requestCameraPermission(cameraIndex)
 							.then(() => {
-								// Permissions granted, now initialize camera
-								// Note: initCam will still use exact constraints, but permissions are already granted
 								source.initCam(cameraIndex);
+								//TODO: Ideally node build should be called here;
+								//TODO: should be forcing node chain execution
 							})
 							.catch((err) => {
 								console.error('Camera permission denied or error:', err);
-								// Set state back to inactive so user can retry
 								node.state = 'inactive';
 							});
 						node.state = 'loading';
