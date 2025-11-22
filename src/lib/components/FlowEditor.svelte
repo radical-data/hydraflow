@@ -10,24 +10,28 @@
 	import { onDestroy, setContext } from 'svelte';
 
 	import type { Issue } from '../engine/HydraEngine.js';
+	import type { ExamplePatch } from '../examples/types.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
 	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
 	import { getLayoutedElements } from '../utils/layout.js';
 	import { createLayoutAnimator } from '../utils/layoutAnimator.js';
 	import CustomEdge from './CustomEdge.svelte';
 	import CustomNode from './CustomNode.svelte';
+	import ExamplesBar from './ExamplesBar.svelte';
 	let {
 		nodes = $bindable(),
 		edges = $bindable(),
 		addNode,
 		updateNodeData,
-		validationIssues = []
+		validationIssues = [],
+		onSelectExample
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 		validationIssues?: Issue[];
+		onSelectExample?: (ex: ExamplePatch) => void;
 	}>();
 
 	let displayNodes = $state.raw<IRNode[]>([]);
@@ -298,20 +302,25 @@
 <div class="flow-editor">
 	<div class="toolbar">
 		<div class="toolbar-left">
-			<div class="category-tabs">
-				{#each tabCategories as category (category)}
-					{@const groups = nodesByCategory()}
-					<button
-						class="category-tab"
-						class:active={activeCategory === category}
-						onclick={() => (activeCategory = category)}
-					>
-						{categoryLabels[category]}
-						<span class="tab-count">
-							({groups[category].length})
-						</span>
-					</button>
-				{/each}
+			<div class="toolbar-top-row">
+				{#if onSelectExample}
+					<ExamplesBar onSelect={onSelectExample} />
+				{/if}
+				<div class="category-tabs">
+					{#each tabCategories as category (category)}
+						{@const groups = nodesByCategory()}
+						<button
+							class="category-tab"
+							class:active={activeCategory === category}
+							onclick={() => (activeCategory = category)}
+						>
+							{categoryLabels[category]}
+							<span class="tab-count">
+								({groups[category].length})
+							</span>
+						</button>
+					{/each}
+				</div>
 			</div>
 			<div class="node-buttons">
 				{#if nodeDefinitions.length === 0}
@@ -388,6 +397,13 @@
 		flex: 1;
 		width: 100%;
 		min-width: 0;
+	}
+
+	.toolbar-top-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
 	}
 
 	.node-buttons {
