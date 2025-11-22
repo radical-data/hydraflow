@@ -21,7 +21,6 @@ export interface NodeDefinition {
 	id: string;
 	label: string;
 	category: 'source' | 'modifier' | 'mixer' | 'output';
-	state?: 'active' | 'inactive';
 	inputs: InputSchema[];
 	outputs: OutputSchema[];
 	build: (ctx: HydraBuildCtx, args: Record<string, InputValue>) => HydraChain;
@@ -30,11 +29,9 @@ export interface NodeDefinition {
 export interface HydraBuildCtx {
 	generators: typeof import('hydra-ts').generators;
 	outputs: import('hydra-ts').Output[];
-	sources: import('hydra-ts').Source[];
 }
 
 export type HydraChain = unknown; // TODO: Fix when hydra-ts types are resolved
-export type NodeState = 'inactive' | 'loading' | 'active';
 
 export interface IRNode {
 	id: string;
@@ -43,7 +40,6 @@ export interface IRNode {
 	position: { x: number; y: number };
 	sourcePosition?: 'left' | 'right' | 'top' | 'bottom';
 	targetPosition?: 'left' | 'right' | 'top' | 'bottom';
-	state?: NodeState; // For nodes that need async initialization (e.g., camera)
 }
 
 export interface IREdge {
