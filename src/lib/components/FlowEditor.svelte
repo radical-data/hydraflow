@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { EdgeTypes, Node, OnBeforeConnect, OnBeforeReconnect } from '@xyflow/svelte';
 	import { Background, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
-	import { onDestroy, setContext } from 'svelte';
+	import { onDestroy, onMount, setContext } from 'svelte';
 
 	import type { Issue } from '../engine/HydraEngine.js';
 	import { getAllDefinitions } from '../nodes/registry.js';
@@ -26,6 +26,11 @@
 
 	let displayNodes = $state.raw<IRNode[]>([]);
 	let isInitialized = $state(false);
+	let selectedNodeId = $state<string | null>(null);
+	let selectedEdgeId = $state<string | null>(null);
+	let deleteButtonPosition = $state<{ x: number; y: number } | null>(null);
+	let isMobile = $state(false);
+	let lastClickPosition = $state<{ x: number; y: number } | null>(null);
 
 	type NodeValidationStatus = {
 		hasError: boolean;
@@ -37,6 +42,10 @@
 		hasError: boolean;
 		hasWarning: boolean;
 	};
+
+	// Types for SvelteFlow nodes/edges with selection state
+	type SelectableNode = IRNode & { selected?: boolean };
+	type SelectableEdge = IREdge & { selected?: boolean };
 
 	const edgeTypes: EdgeTypes = {
 		default: CustomEdge
@@ -234,6 +243,102 @@
 		clearTargetHandle(newConnection);
 		return newConnection;
 	};
+
+	// Mobile detection
+	onMount(() => {
+		const checkMobile = () => {
+			isMobile = window.matchMedia('(max-width: 768px)').matches || 'ontouchstart' in window;
+		};
+		checkMobile();
+		window.addEventListener('resize', checkMobile);
+		return () => window.removeEventListener('resize', checkMobile);
+	});
+
+	// Track selected nodes and edges reactively
+	$effect(() => {
+		if (!isMobile) {
+			selectedNodeId = null;
+			selectedEdgeId = null;
+			deleteButtonPosition = null;
+			return;
+		}
+
+		// Find selected node
+		const selectedNode = displayNodes.find((n: IRNode) => (n as SelectableNode).selected);
+		const selectedEdge = edges.find((e: IREdge) => (e as SelectableEdge).selected);
+
+		if (selectedNode) {
+			selectedNodeId = selectedNode.id;
+			selectedEdgeId = null;
+			// Use last click position if available, otherwise position near node
+			if (lastClickPosition) {
+				deleteButtonPosition = { x: lastClickPosition.x, y: lastClickPosition.y - 50 };
+			} else {
+				// Fallback: position in center of screen
+				deleteButtonPosition = { x: window.innerWidth / 2, y: 100 };
+			}
+		} else if (selectedEdge) {
+			selectedEdgeId = selectedEdge.id;
+			selectedNodeId = null;
+			// Use last click position if available
+			if (lastClickPosition) {
+				deleteButtonPosition = { x: lastClickPosition.x, y: lastClickPosition.y - 50 };
+			} else {
+				// Fallback: position in center of screen
+				deleteButtonPosition = { x: window.innerWidth / 2, y: 100 };
+			}
+		} else {
+			selectedNodeId = null;
+			selectedEdgeId = null;
+			deleteButtonPosition = null;
+			lastClickPosition = null;
+		}
+	});
+
+	// Capture click position for button placement
+	// Use a small delay to capture position after SvelteFlow processes the click
+	function handleFlowClick(event: MouseEvent | TouchEvent) {
+		if (!isMobile) return;
+		// Use setTimeout to capture position after SvelteFlow processes selection
+		setTimeout(() => {
+			const clientX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
+			const clientY = 'touches' in event ? event.touches[0]?.clientY : event.clientY;
+			if (clientX !== undefined && clientY !== undefined) {
+				lastClickPosition = { x: clientX, y: clientY };
+			}
+		}, 10);
+	}
+
+	// Delete selected node
+	function deleteSelectedNode() {
+		if (selectedNodeId) {
+			// Remove the node
+			nodes = nodes.filter((n) => n.id !== selectedNodeId);
+			// Remove all edges connected to this node
+			edges = edges.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId);
+			selectedNodeId = null;
+			deleteButtonPosition = null;
+		}
+	}
+
+	// Delete selected edge
+	function deleteSelectedEdge() {
+		if (selectedEdgeId) {
+			edges = edges.filter((e) => e.id !== selectedEdgeId);
+			selectedEdgeId = null;
+			deleteButtonPosition = null;
+		}
+	}
+
+	// Handle delete button click
+	function handleDelete(event: MouseEvent | TouchEvent) {
+		event.stopPropagation();
+		if (selectedNodeId) {
+			deleteSelectedNode();
+		} else if (selectedEdgeId) {
+			deleteSelectedEdge();
+		}
+	}
 </script>
 
 <div class="flow-editor">
@@ -254,7 +359,7 @@
 			{/if}
 		</div>
 	</div>
-	<div class="flow-canvas">
+	<div class="flow-canvas" onclick={handleFlowClick} ontouchstart={handleFlowClick}>
 		{#if Object.keys(nodeTypes).length > 0}
 			<SvelteFlow
 				bind:nodes={displayNodes as Node[]}
@@ -271,6 +376,19 @@
 				<Controls showLock={false} />
 				<MiniMap />
 			</SvelteFlow>
+			{#if isMobile && deleteButtonPosition && (selectedNodeId || selectedEdgeId)}
+				<button
+					class="mobile-delete-btn"
+					style="left: {deleteButtonPosition.x}px; top: {deleteButtonPosition.y}px;"
+					onclick={handleDelete}
+					onmousedown={(e) => e.stopPropagation()}
+					ontouchstart={(e) => e.stopPropagation()}
+					role="button"
+					aria-label="Delete {selectedNodeId ? 'node' : 'edge'}"
+				>
+					Delete
+				</button>
+			{/if}
 		{:else}
 			<div class="loading-canvas">
 				<div class="loading-message">Initializing Hydra Flow...</div>
@@ -381,5 +499,35 @@
 	:global(.svelte-flow__minimap) {
 		background: rgba(255, 255, 255, 0.9);
 		backdrop-filter: blur(4px);
+	}
+
+	.mobile-delete-btn {
+		position: fixed;
+		z-index: 1000;
+		background: #ef4444;
+		color: white;
+		border: none;
+		border-radius: 8px;
+		padding: 10px 20px;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		transform: translate(-50%, -100%);
+		transition: all 0.2s ease;
+		touch-action: manipulation;
+		-webkit-tap-highlight-color: transparent;
+		pointer-events: auto;
+	}
+
+	.mobile-delete-btn:active {
+		background: #dc2626;
+		transform: translate(-50%, -100%) scale(0.95);
+	}
+
+	@media (min-width: 769px) {
+		.mobile-delete-btn {
+			display: none;
+		}
 	}
 </style>
