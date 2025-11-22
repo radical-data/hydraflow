@@ -86,6 +86,7 @@ export class HydraEngine {
 
 	async init(canvas: HTMLCanvasElement): Promise<void> {
 		this.canvas = canvas;
+		this.canvas.style.backgroundColor = '#000000';
 
 		try {
 			// Dynamic imports to avoid SSR issues

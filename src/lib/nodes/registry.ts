@@ -86,6 +86,9 @@ async function initializeRegistry(): Promise<void> {
 	);
 
 	nodeDefinitions.set('out', outDefinition);
+
+	//TODO: Fix shift node definition
+	nodeDefinitions.delete('shift');
 }
 
 async function ensureInitialized(): Promise<void> {
