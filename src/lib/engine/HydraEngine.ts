@@ -1,3 +1,4 @@
+import { buildCamNode } from '../nodes/definitions/cam.js';
 import type { IREdge, IRNode } from '../types.js';
 
 export type IssueSeverity = 'error' | 'warning';
@@ -82,42 +83,6 @@ export class HydraEngine {
 		if (this.hydra) {
 			this.hydra.setResolution(this.canvas.width, this.canvas.height);
 		}
-	}
-
-	/**
-	 * Request camera permissions with less restrictive constraints to avoid OverconstrainedError
-	 * Uses 'ideal' instead of 'exact' for deviceId to be more flexible
-	 */
-	private async requestCameraPermission(deviceId: number): Promise<void> {
-		if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-			throw new Error('Camera API not available');
-		}
-
-		// First, enumerate devices to get available cameras
-		const devices = await navigator.mediaDevices.enumerateDevices();
-		const cameras = devices.filter((device) => device.kind === 'videoinput');
-
-		// Build constraints with 'ideal' instead of 'exact' to avoid OverconstrainedError
-		const constraints: MediaStreamConstraints = {
-			audio: false,
-			video: cameras[deviceId]
-				? {
-						deviceId: {
-							ideal: cameras[deviceId].deviceId
-						},
-						width: { ideal: 1280 / 2 },
-						height: { ideal: 720 / 2 }
-					}
-				: {
-						width: { ideal: 1280 / 2 },
-						height: { ideal: 720 / 2 }
-					}
-		};
-
-		// Request permission with less restrictive constraints
-		const stream = await navigator.mediaDevices.getUserMedia(constraints);
-		// Stop the stream immediately - we just needed permission
-		stream.getTracks().forEach((track) => track.stop());
 	}
 
 	async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -246,118 +211,14 @@ export class HydraEngine {
 			return result;
 		}
 
-		/**
-		 * SKETCHY VERSION OF HANDLING CAMERA AS SPECIAL CASE
-		 * Current status:
-		 * - node is being created
-		 * - need to reload the graph to make it work (click on edge/validate the graph again)
-		 */
+		// Handle camera node as special case
 		if (node.type === 'cam') {
-			// Check node state - skip if inactive
-			if (node.state === 'inactive') {
-				const result: BuildResult = {
-					ok: false,
-					issues: [
-						{
-							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
-							kind: 'RUNTIME_EXECUTION_ERROR',
-							severity: 'warning',
-							message: 'Camera node is inactive',
-							nodeId: node.id
-						}
-					]
-				};
-				memo.set(nodeId, result);
-				return result;
-			}
-
-			// Initialize node state if not set
-			if (!node.state) {
-				node.state = 'inactive';
-			}
-
-			try {
-				//TODO: this is basically the build of the node definition
-				const sourceIndex = 0;
-				const source = this.hydra.sources[sourceIndex];
-				const cameraIndex = Number(node.data?.source_camera ?? 0);
-
-				if (source && source.src) {
-					// Checks that src is ready and video is ready (source.src)
-					node.state = 'active';
-					const chain = this.generators.src(source);
-					const result = { ok: true, chain } as BuildResult;
-					memo.set(nodeId, result);
-
-					return result;
-				} else {
-					// Trigger camera initialization if not already loading
-					if (node.state === 'inactive' && source && typeof source.initCam === 'function') {
-						// Request camera permissions first with less restrictive constraints
-						// This helps avoid OverconstrainedError by using 'ideal' instead of 'exact'
-						this.requestCameraPermission(cameraIndex)
-							.then(() => {
-								source.initCam(cameraIndex);
-								//TODO: Ideally node build should be called here;
-
-								// Poll for source.src to be defined, then execute graph
-								const maxAttempts = 30;
-								const pollInterval = 200; // Check every 200ms
-								let attempts = 0;
-
-								const checkInterval = setInterval(() => {
-									attempts++;
-
-									if (source.src) {
-										clearInterval(checkInterval);
-										this.executeGraph(nodes, edges);
-									} else if (attempts >= maxAttempts) {
-										clearInterval(checkInterval);
-										console.warn('Timeout waiting for camera source to be ready');
-										node.state = 'inactive';
-									}
-								}, pollInterval);
-							})
-							.catch((err) => {
-								console.error('Camera permission denied or error:', err);
-								node.state = 'inactive';
-							});
-						node.state = 'loading';
-					}
-
-					// Still loading
-					const result: BuildResult = {
-						ok: false,
-						issues: [
-							{
-								key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
-								kind: 'RUNTIME_EXECUTION_ERROR',
-								severity: 'warning',
-								message: 'Camera is loading...',
-								nodeId: node.id
-							}
-						]
-					};
-					memo.set(nodeId, result);
-					return result;
-				}
-			} catch (err) {
-				const message = err instanceof Error ? err.message : 'Unknown error building cam node';
-				const result: BuildResult = {
-					ok: false,
-					issues: [
-						{
-							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
-							kind: 'RUNTIME_EXECUTION_ERROR',
-							severity: 'error',
-							message: `Error building cam: ${message}`,
-							nodeId: node.id
-						}
-					]
-				};
-				memo.set(nodeId, result);
-				return result;
-			}
+			const result = buildCamNode(node, nodes, edges, nodeId, memo, {
+				hydra: this.hydra!,
+				generators: this.generators!,
+				executeGraph: this.executeGraph.bind(this)
+			});
+			return result ?? { ok: false, issues: [] };
 		}
 
 		// Validate transform exists
