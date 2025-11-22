@@ -407,7 +407,6 @@ export class HydraEngine {
 			const callArgs = trimUndefTail(rawArgs);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			chain = (this.generators as any)[node.type](...callArgs);
-			console.log('chain', chain);
 		} else if (tType === 'coord' || tType === 'color') {
 			// Unary operation
 			const inputResult = this.buildChainValidated(
@@ -542,7 +541,6 @@ export class HydraEngine {
 	}
 
 	executeGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
-		console.log('executeGraph');
 		if (!this.hydra || !this.isInitialized) {
 			console.warn('HydraEngine not initialized');
 			return [];
