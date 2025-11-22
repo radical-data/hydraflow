@@ -40,6 +40,8 @@ const trimUndefTail = (xs: unknown[]) => {
 	return a;
 };
 
+const CAMERA_SOURCE_INDEX = 0;
+
 function makeIssueKey(kind: IssueKind, parts: Array<string | number | undefined>): string {
 	return [kind, ...parts.map((p) => (p ?? '').toString())].join(':');
 }
@@ -70,6 +72,9 @@ export class HydraEngine {
 	private typeByName = new Map<string, TransformType>();
 	private inputsByName = new Map<string, string[]>();
 
+	private isCameraInitialised = false;
+	private cameraInitError: string | null = null;
+
 	private onWindowResize(): void {
 		if (!this.canvas) return;
 
@@ -81,6 +86,28 @@ export class HydraEngine {
 
 		if (this.hydra) {
 			this.hydra.setResolution(this.canvas.width, this.canvas.height);
+		}
+	}
+
+	private initCameraSource(): void {
+		if (this.isCameraInitialised || this.cameraInitError || !this.hydra) return;
+
+		this.isCameraInitialised = true;
+
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const hydraAny = this.hydra as any;
+			const source = hydraAny.sources?.[CAMERA_SOURCE_INDEX];
+
+			if (!source || typeof source.initCam !== 'function') {
+				throw new Error('Hydra camera source not available');
+			}
+
+			source.initCam();
+		} catch (error) {
+			this.cameraInitError =
+				error instanceof Error ? error.message : 'Unknown error initialising camera source';
+			console.warn('Camera initialisation failed:', error);
 		}
 	}
 
@@ -207,6 +234,55 @@ export class HydraEngine {
 					}
 				]
 			};
+			memo.set(nodeId, result);
+			return result;
+		}
+
+		if (node.type === 'camera') {
+			if (!this.hydra) {
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message: 'Hydra is not initialised; cannot use camera source',
+							nodeId: node.id
+						}
+					]
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			this.initCameraSource();
+
+			if (this.cameraInitError) {
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message: this.cameraInitError,
+							nodeId: node.id
+						}
+					]
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const gens = this.generators as any;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const hydraAny = this.hydra as any;
+			const source = hydraAny.sources?.[CAMERA_SOURCE_INDEX];
+			const chain = typeof gens.src === 'function' ? gens.src(source) : gens.solid?.(0, 0, 0, 1);
+
+			const result: BuildResult = { ok: true, chain };
 			memo.set(nodeId, result);
 			return result;
 		}

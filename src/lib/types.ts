@@ -32,6 +32,7 @@ export interface HydraBuildCtx {
 }
 
 export type HydraChain = unknown; // TODO: Fix when hydra-ts types are resolved
+
 export interface IRNode {
 	id: string;
 	type: string;
