@@ -278,16 +278,8 @@ export class HydraEngine {
 			const gens = this.generators as any;
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const hydraAny = this.hydra as any;
-			const enabled = node.data?.enabled !== false;
-
-			let chain: unknown;
-
-			if (!enabled) {
-				chain = gens.solid?.(0, 0, 0, 1);
-			} else {
-				const source = hydraAny.sources?.[CAMERA_SOURCE_INDEX];
-				chain = typeof gens.src === 'function' ? gens.src(source) : gens.solid?.(0, 0, 0, 1);
-			}
+			const source = hydraAny.sources?.[CAMERA_SOURCE_INDEX];
+			const chain = typeof gens.src === 'function' ? gens.src(source) : gens.solid?.(0, 0, 0, 1);
 
 			const result: BuildResult = { ok: true, chain };
 			memo.set(nodeId, result);
