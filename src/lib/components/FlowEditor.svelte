@@ -1,5 +1,11 @@
 <script lang="ts">
-	import type { EdgeTypes, Node, OnBeforeConnect, OnBeforeReconnect } from '@xyflow/svelte';
+	import type {
+		EdgeTypes,
+		Node,
+		OnBeforeConnect,
+		OnBeforeReconnect,
+		OnDelete
+	} from '@xyflow/svelte';
 	import { Background, Controls, MiniMap, SvelteFlow } from '@xyflow/svelte';
 	import { onDestroy, setContext } from 'svelte';
 
@@ -265,6 +271,28 @@
 		clearTargetHandle(newConnection);
 		return newConnection;
 	};
+
+	const handleDelete: OnDelete = ({ nodes: deletedNodes, edges: deletedEdges }) => {
+		if (!deletedNodes.length && !deletedEdges.length) return;
+
+		const deletedNodeIds = new Set(deletedNodes.map((n) => n.id));
+		const deletedEdgeIds = new Set(deletedEdges.map((e) => e.id));
+
+		// SvelteFlow deletes from its own view state only.
+		// We must also update our canonical graph (nodes/edges). If not, deleted items
+		// will reappear when layout + animation runs next.
+		nodes = nodes.filter((node: IRNode) => !deletedNodeIds.has(node.id));
+
+		// Clean up canonical edges:
+		//  - remove edges deleted by SvelteFlow
+		//  - remove any edges connected to deleted nodes (defensive)
+		edges = edges.filter(
+			(edge: IREdge) =>
+				!deletedEdgeIds.has(edge.id) &&
+				!deletedNodeIds.has(edge.source) &&
+				!deletedNodeIds.has(edge.target)
+		);
+	};
 </script>
 
 <div class="flow-editor">
@@ -316,6 +344,7 @@
 				nodesDraggable={false}
 				onbeforeconnect={handleBeforeConnect}
 				onbeforereconnect={handleBeforeReconnect}
+				ondelete={handleDelete}
 				class="flow-container"
 			>
 				<Background />
