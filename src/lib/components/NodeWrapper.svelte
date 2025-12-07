@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 
-	import type { Issue } from '../engine/HydraEngine.js';
+	import type { NodeValidationStatus } from '../engine/graphValidation.js';
 	import type { InputValue, NodeDefinition } from '../types.js';
 	import NodeUI from './NodeUI.svelte';
 
@@ -11,12 +11,6 @@
 		data: Record<string, InputValue>;
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 	}>();
-
-	type NodeValidationStatus = {
-		hasError: boolean;
-		hasWarning: boolean;
-		issues: Issue[];
-	};
 
 	// Get node definitions from context (reactive)
 	const getNodeDefinitions = getContext<() => NodeDefinition[]>('nodeDefinitions');

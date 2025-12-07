@@ -1,30 +1,19 @@
 import type { IREdge, IRNode } from '../types.js';
+import {
+	dedupeIssues,
+	type GraphValidationResult,
+	type Issue,
+	makeIssueKey,
+	rebuildGraphValidationResult,
+	type TransformMeta,
+	type TransformType,
+	validateGraph as validateGraphStatic
+} from './graphValidation.js';
 
-export type IssueSeverity = 'error' | 'warning';
+export type { Issue, IssueKind, IssueSeverity } from './graphValidation.js';
 
-export type IssueKind =
-	| 'CYCLE'
-	| 'NODE_NOT_FOUND'
-	| 'UNKNOWN_TRANSFORM'
-	| 'NODE_MISSING_INPUTS'
-	| 'NODE_EXTRA_INPUTS'
-	| 'OUTPUT_INDEX_OUT_OF_RANGE'
-	| 'OUTPUT_ARITY'
-	| 'RUNTIME_EXECUTION_ERROR';
-
-export type Issue = {
-	key: string;
-	severity: IssueSeverity;
-	kind: IssueKind;
-	message: string;
-	nodeId?: string;
-	edgeId?: string;
-	outputIndex?: number;
-};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
-
-type TransformType = 'src' | 'coord' | 'color' | 'combine' | 'combineCoord';
 
 const ARITY: Record<TransformType, 0 | 1 | 2> = {
 	src: 0,
@@ -42,20 +31,6 @@ const trimUndefTail = (xs: unknown[]) => {
 
 const CAMERA_SOURCE_INDEX = 0;
 
-function makeIssueKey(kind: IssueKind, parts: Array<string | number | undefined>): string {
-	return [kind, ...parts.map((p) => (p ?? '').toString())].join(':');
-}
-
-function dedupeIssues(issues: Issue[]): Issue[] {
-	const byKey = new Map<string, Issue>();
-	for (const issue of issues) {
-		if (!byKey.has(issue.key)) {
-			byKey.set(issue.key, issue);
-		}
-	}
-	return Array.from(byKey.values());
-}
-
 export class HydraEngine {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private hydra: any | null = null;
@@ -71,6 +46,18 @@ export class HydraEngine {
 	private arityByName = new Map<string, 0 | 1 | 2>();
 	private typeByName = new Map<string, TransformType>();
 	private inputsByName = new Map<string, string[]>();
+
+	private getTransformMeta(): TransformMeta {
+		return {
+			arityByName: this.arityByName,
+			typeByName: this.typeByName,
+			inputsByName: this.inputsByName
+		};
+	}
+
+	private getNumOutputs(): number {
+		return this.hydra?.outputs?.length ?? 4;
+	}
 
 	private isCameraInitialised = false;
 	private cameraInitError: string | null = null;
@@ -399,105 +386,100 @@ export class HydraEngine {
 		return result;
 	}
 
-	validateGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
-		const issues: Issue[] = [];
-		const memo = new Map<string, BuildResult>();
-
-		const outputNodes = nodes.filter((node) => node.type === 'out');
-		for (const outputNode of outputNodes) {
-			const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
-
-			// Validate output index range
-			if (
-				!Number.isInteger(outputIndex) ||
-				outputIndex < 0 ||
-				!this.hydra ||
-				outputIndex >= this.hydra.outputs.length
-			) {
-				issues.push({
-					key: makeIssueKey('OUTPUT_INDEX_OUT_OF_RANGE', [outputNode.id, outputIndex]),
-					kind: 'OUTPUT_INDEX_OUT_OF_RANGE',
-					severity: 'error',
-					message: `Output index ${outputIndex} out of range (0…${
-						this.hydra ? this.hydra.outputs.length - 1 : -1
-					})`,
-					nodeId: outputNode.id,
-					outputIndex
-				});
-				continue;
-			}
-
-			// Validate exactly one input
-			const inEdges = edges.filter((e) => e.target === outputNode.id);
-			if (inEdges.length !== 1) {
-				issues.push({
-					key: makeIssueKey('OUTPUT_ARITY', [outputNode.id]),
-					kind: 'OUTPUT_ARITY',
-					severity: 'error',
-					message: `Output expects exactly 1 input, found ${inEdges.length}`,
-					nodeId: outputNode.id,
-					outputIndex
-				});
-				continue;
-			}
-
-			const inputEdge = inEdges[0];
-			const result = this.buildChainValidated(nodes, edges, inputEdge.source, new Set(), memo);
-			if (!result.ok) {
-				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
-			}
-		}
-
-		return dedupeIssues(issues);
+	private getGraphValidation(nodes: IRNode[], edges: IREdge[]): GraphValidationResult {
+		return validateGraphStatic({
+			nodes,
+			edges,
+			numOutputs: this.getNumOutputs(),
+			meta: this.getTransformMeta()
+		});
 	}
 
-	executeGraph(nodes: IRNode[], edges: IREdge[]): Issue[] {
+	private buildAndExecuteChain(
+		nodes: IRNode[],
+		edges: IREdge[],
+		nodeId: string,
+		outputIndex: number
+	): { ok: true } | { ok: false; issues: Issue[] } {
+		const result = this.buildChainValidated(nodes, edges, nodeId);
+		if (!result.ok) {
+			return result;
+		}
+
+		if (!this.hydra) {
+			return {
+				ok: false,
+				issues: [
+					{
+						key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [nodeId, outputIndex]),
+						kind: 'RUNTIME_EXECUTION_ERROR',
+						severity: 'error',
+						message: 'Hydra is not initialised',
+						nodeId,
+						outputIndex
+					}
+				]
+			};
+		}
+
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(result.chain as any).out(this.hydra.outputs[outputIndex]);
+			return { ok: true };
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : 'Unknown runtime error while executing graph';
+			return {
+				ok: false,
+				issues: [
+					{
+						key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [nodeId, outputIndex]),
+						kind: 'RUNTIME_EXECUTION_ERROR',
+						severity: 'error',
+						message,
+						nodeId,
+						outputIndex
+					}
+				]
+			};
+		}
+	}
+
+	executeGraph(nodes: IRNode[], edges: IREdge[]): GraphValidationResult {
+		const baseValidation = this.getGraphValidation(nodes, edges);
+		const structuralIssues = [...baseValidation.issues];
+		const hasStructuralErrors = structuralIssues.some((i) => i.severity === 'error');
+
+		const runtimeIssues: Issue[] = [];
+
 		if (!this.hydra || !this.isInitialized) {
 			console.warn('HydraEngine not initialized');
-			return [];
-		}
+		} else if (!hasStructuralErrors) {
+			const outputNodes = nodes.filter((node) => node.type === 'out');
 
-		const validationIssues = this.validateGraph(nodes, edges);
-		const hasErrors = validationIssues.some((i) => i.severity === 'error');
+			for (const outputNode of outputNodes) {
+				const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
+				const inEdges = edges.filter((e) => e.target === outputNode.id);
 
-		if (hasErrors) {
-			return validationIssues;
-		}
+				if (inEdges.length !== 1) continue;
 
-		const issues: Issue[] = [...validationIssues];
-		const outputNodes = nodes.filter((node) => node.type === 'out');
-
-		for (const outputNode of outputNodes) {
-			const outputIndex = Number(outputNode.data?.outputIndex ?? 0);
-			const inEdges = edges.filter((e) => e.target === outputNode.id);
-
-			if (inEdges.length !== 1) continue;
-
-			const inputEdge = inEdges[0];
-			const result = this.buildChainValidated(nodes, edges, inputEdge.source);
-			if (!result.ok) {
-				issues.push(...(result as { ok: false; issues: Issue[] }).issues);
-				continue;
-			}
-
-			try {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				(result.chain as any).out(this.hydra.outputs[outputIndex]);
-			} catch (err) {
-				const message =
-					err instanceof Error ? err.message : 'Unknown runtime error while executing graph';
-				issues.push({
-					key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [outputNode.id, outputIndex]),
-					kind: 'RUNTIME_EXECUTION_ERROR',
-					severity: 'error',
-					message,
-					nodeId: outputNode.id,
-					outputIndex
-				});
+				const inputEdge = inEdges[0];
+				const result = this.buildAndExecuteChain(nodes, edges, inputEdge.source, outputIndex);
+				if (!result.ok) {
+					runtimeIssues.push(...result.issues);
+				}
 			}
 		}
 
-		return dedupeIssues(issues);
+		const allIssues = dedupeIssues([...structuralIssues, ...runtimeIssues]);
+
+		return rebuildGraphValidationResult(
+			nodes,
+			edges,
+			allIssues,
+			baseValidation.reachableNodes,
+			baseValidation.reachableEdges
+		);
 	}
 
 	start(): void {

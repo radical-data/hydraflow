@@ -16,7 +16,9 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"lint": "prettier --check . && eslint ."
+		"lint": "prettier --check . && eslint .",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"lint-staged": {
 		"*.{js,ts,svelte,json,md,css,yml,yaml}": [
@@ -46,7 +48,8 @@
 		"svelte-check": "^4.3.2",
 		"typescript": "^5.9.2",
 		"typescript-eslint": "^8.44.1",
-		"vite": "^7.1.7"
+		"vite": "^7.1.7",
+		"vitest": "^3.2.0"
 	},
 	"dependencies": {
 		"@dagrejs/dagre": "^1.1.5",

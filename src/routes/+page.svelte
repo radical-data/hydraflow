@@ -3,7 +3,7 @@
 
 	import FlowEditor from '$lib/components/FlowEditor.svelte';
 	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
-	import type { Issue } from '$lib/engine/HydraEngine.js';
+	import type { GraphValidationResult } from '$lib/engine/graphValidation.js';
 	import type { IREdge, IRNode } from '$lib/types.js';
 
 	let nodes = $state.raw<IRNode[]>([
@@ -94,7 +94,7 @@
 		return id;
 	}
 
-	let validationIssues = $state.raw<Issue[]>([]);
+	let validationResult = $state.raw<GraphValidationResult | null>(null);
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	function updateNodeData(nodeId: string, data: Record<string, any>): void {
@@ -105,7 +105,7 @@
 </script>
 
 <div class="w-full h-screen bg-black relative">
-	<HydraCanvas {nodes} {edges} onValidationIssues={(issues) => (validationIssues = issues)} />
+	<HydraCanvas {nodes} {edges} onValidationResult={(result) => (validationResult = result)} />
 
-	<FlowEditor bind:nodes bind:edges {addNode} {updateNodeData} {validationIssues} />
+	<FlowEditor bind:nodes bind:edges {addNode} {updateNodeData} {validationResult} />
 </div>
