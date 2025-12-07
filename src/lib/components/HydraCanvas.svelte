@@ -2,29 +2,31 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import type { GraphValidationResult } from '../engine/graphValidation.js';
+	import type { HydraEngine } from '../engine/HydraEngine.js';
 	import type { IREdge, IRNode } from '../types.js';
 
 	let {
+		engine,
 		nodes = [],
 		edges = [],
 		onValidationResult
 	} = $props<{
+		engine: HydraEngine;
 		nodes?: IRNode[];
 		edges?: IREdge[];
 		onValidationResult?: (result: GraphValidationResult) => void;
 	}>();
 
 	let canvas: HTMLCanvasElement;
-	let engine: import('../engine/HydraEngine.js').HydraEngine;
 	let isInitialized = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	onMount(async () => {
+		if (!engine) return;
+
 		canvas.width = window.innerWidth;
 		canvas.height = window.innerHeight;
 
-		const { HydraEngine } = await import('../engine/HydraEngine.js');
-		engine = new HydraEngine();
 		await engine.init(canvas);
 		engine.start();
 		isInitialized = true;

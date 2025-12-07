@@ -1,3 +1,5 @@
+import type { TransformSpec } from './engine/transformSpec.js';
+
 export type InputValue = string | number | boolean;
 
 export interface InputSchema {
@@ -24,6 +26,8 @@ export interface NodeDefinition {
 	inputs: InputSchema[];
 	outputs: OutputSchema[];
 	build: (ctx: HydraBuildCtx, args: Record<string, InputValue>) => HydraChain;
+	// Optional link back to core spec
+	spec?: TransformSpec;
 }
 
 export interface HydraBuildCtx {
