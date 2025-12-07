@@ -18,6 +18,7 @@
 		validationStatus?: {
 			hasError: boolean;
 			hasWarning: boolean;
+			isDead: boolean;
 			issues: Issue[];
 		} | null;
 	}>();
@@ -51,6 +52,7 @@
 	const hasWarning = $derived(!hasError && !!validationStatus?.hasWarning);
 	// Normalise issues so the template never sees `undefined`
 	const issues = $derived(validationStatus?.issues ?? []);
+	const isDead = $derived(validationStatus ? !!validationStatus?.isDead : true);
 </script>
 
 {#if isEndNode}
@@ -64,14 +66,19 @@
 				isConnectable={true}
 			/>
 		{/each}
-		<div class="node-container circular" class:error={hasError} class:warning={hasWarning}>
+		<div
+			class="node-container circular"
+			class:error={hasError}
+			class:warning={hasWarning}
+			class:dead={isDead}
+		>
 			<span class="circular-label">
 				{definition.label}
 			</span>
 		</div>
 	</div>
 {:else}
-	<div class="node-container" class:error={hasError} class:warning={hasWarning}>
+	<div class="node-container" class:error={hasError} class:warning={hasWarning} class:dead={isDead}>
 		{#each inputIndices as i (i)}
 			{@const isMixer = definition.category === 'mixer'}
 			{@const leftOffset = isMixer ? (i === 0 ? 30 : 150) : 90}
@@ -356,5 +363,14 @@
 
 	.validation-messages li.message-warning {
 		color: #92400e;
+	}
+
+	.node-container.dead,
+	.node-container.circular.dead {
+		opacity: 0.35;
+		filter: grayscale(0.6);
+		border-style: dashed;
+		border-color: #9ca3af; /* neutral grey */
+		box-shadow: none;
 	}
 </style>
