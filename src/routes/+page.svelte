@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { nanoid } from 'nanoid';
+	import { onMount } from 'svelte';
 
+	import { bootstrapHydraApp } from '$lib/app/bootstrapHydra.js';
 	import FlowEditor from '$lib/components/FlowEditor.svelte';
 	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
 	import type { GraphValidationResult } from '$lib/engine/graphValidation.js';
-	import type { IREdge, IRNode } from '$lib/types.js';
+	import type { HydraEngine } from '$lib/engine/HydraEngine.js';
+	import type { IREdge, IRNode, NodeDefinition } from '$lib/types.js';
 
 	let nodes = $state.raw<IRNode[]>([
 		{
@@ -95,6 +98,14 @@
 	}
 
 	let validationResult = $state.raw<GraphValidationResult | null>(null);
+	let engine = $state<HydraEngine | null>(null);
+	let nodeDefinitions = $state<NodeDefinition[]>([]);
+
+	onMount(async () => {
+		const { engine: e, nodeDefinitions: defs } = await bootstrapHydraApp();
+		engine = e;
+		nodeDefinitions = defs;
+	});
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	function updateNodeData(nodeId: string, data: Record<string, any>): void {
@@ -105,7 +116,21 @@
 </script>
 
 <div class="w-full h-screen bg-black relative">
-	<HydraCanvas {nodes} {edges} onValidationResult={(result) => (validationResult = result)} />
+	{#if engine}
+		<HydraCanvas
+			{engine}
+			{nodes}
+			{edges}
+			onValidationResult={(result) => (validationResult = result)}
+		/>
+	{/if}
 
-	<FlowEditor bind:nodes bind:edges {addNode} {updateNodeData} {validationResult} />
+	<FlowEditor
+		bind:nodes
+		bind:edges
+		{addNode}
+		{updateNodeData}
+		{validationResult}
+		{nodeDefinitions}
+	/>
 </div>

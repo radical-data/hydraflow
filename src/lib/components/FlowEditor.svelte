@@ -2,6 +2,7 @@
 	import type {
 		EdgeTypes,
 		Node,
+		NodeTypes,
 		OnBeforeConnect,
 		OnBeforeReconnect,
 		OnDelete
@@ -15,7 +16,6 @@
 		Issue,
 		NodeValidationStatus
 	} from '../engine/graphValidation.js';
-	import { getAllDefinitions } from '../nodes/registry.js';
 	import type { InputValue, IREdge, IRNode, NodeDefinition } from '../types.js';
 	import { getLayoutedElements } from '../utils/layout.js';
 	import { createLayoutAnimator } from '../utils/layoutAnimator.js';
@@ -26,13 +26,15 @@
 		edges = $bindable(),
 		addNode,
 		updateNodeData,
-		validationResult = null
+		validationResult = null,
+		nodeDefinitions: nodeDefinitionsProp = []
 	} = $props<{
 		nodes: IRNode[];
 		edges: IREdge[];
 		addNode: (node: Omit<IRNode, 'id'>) => string;
 		updateNodeData: (nodeId: string, data: Record<string, InputValue>) => void;
 		validationResult?: GraphValidationResult | null;
+		nodeDefinitions: NodeDefinition[];
 	}>();
 
 	let displayNodes = $state.raw<IRNode[]>([]);
@@ -42,8 +44,24 @@
 		default: CustomEdge
 	};
 
+	// Local copies of node definitions and nodeTypes map,
+	// derived from the prop but stored as plain state for TS + runtime sanity.
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
-	let nodeTypes = $state<Record<string, typeof CustomNode>>({});
+	let nodeTypes = $state<NodeTypes>({});
+
+	$effect(() => {
+		// Keep local state in sync with the prop
+		nodeDefinitions = nodeDefinitionsProp;
+
+		// Build the nodeTypes map for SvelteFlow
+		nodeTypes = nodeDefinitionsProp.reduce(
+			(acc: Record<string, typeof CustomNode>, def: NodeDefinition) => {
+				acc[def.id] = CustomNode;
+				return acc;
+			},
+			{} as Record<string, typeof CustomNode>
+		);
+	});
 
 	const categories: NodeDefinition['category'][] = ['source', 'modifier', 'mixer', 'output'];
 
@@ -102,19 +120,6 @@
 			console.error('Graph issues:', issues);
 			lastIssueKeys = keys;
 		}
-	});
-
-	$effect(() => {
-		getAllDefinitions().then((definitions) => {
-			nodeDefinitions = definitions;
-			nodeTypes = definitions.reduce(
-				(types, def) => {
-					types[def.id] = CustomNode;
-					return types;
-				},
-				{} as Record<string, typeof CustomNode>
-			);
-		});
 	});
 
 	function addNodeToFlow(definition: NodeDefinition) {

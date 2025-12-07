@@ -1,5 +1,6 @@
 import type { TransformDefinition } from 'hydra-ts';
 
+import type { TransformSpec } from '../engine/transformSpec.js';
 import type { InputSchema, NodeDefinition } from '../types.js';
 
 // Default ranges for common parameter names
@@ -83,7 +84,10 @@ function transformTypeToCategory(type: TransformDefinition['type']): NodeDefinit
 	return 'modifier';
 }
 
-export function autoDefineFromHydra(transform: TransformDefinition): NodeDefinition {
+export function autoDefineFromHydra(
+	transform: TransformDefinition,
+	spec: TransformSpec
+): NodeDefinition {
 	const category = transformTypeToCategory(transform.type);
 	const inputs = transform.inputs.map(hydraMappedInput);
 	const label = transform.name
@@ -97,6 +101,7 @@ export function autoDefineFromHydra(transform: TransformDefinition): NodeDefinit
 		category,
 		inputs,
 		outputs: [{ id: 'color', type: 'color' }],
+		spec,
 		build:
 			transform.type === 'src'
 				? // Source nodes call generators directly
@@ -109,24 +114,6 @@ export function autoDefineFromHydra(transform: TransformDefinition): NodeDefinit
 				: // Modifier/mixer nodes return {type, args}
 					(_ctx, args) => ({ type: transform.name, args }) as any // eslint-disable-line @typescript-eslint/no-explicit-any
 	};
-}
-
-// Dynamic import for SSR compatibility
-export async function generateAllDefinitions(): Promise<Map<string, NodeDefinition>> {
-	const { defaultGenerators, defaultModifiers } = await import('hydra-ts');
-	const definitions = new Map<string, NodeDefinition>();
-	const allTransforms = [...defaultGenerators, ...defaultModifiers];
-
-	const skipTransforms = new Set(['src', 'out', 'render']);
-
-	for (const transform of allTransforms) {
-		if (skipTransforms.has(transform.name)) continue;
-
-		const definition = autoDefineFromHydra(transform);
-		definitions.set(transform.name, definition);
-	}
-
-	return definitions;
 }
 
 export function overrideDefinition(

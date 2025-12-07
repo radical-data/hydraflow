@@ -15,14 +15,6 @@ export type { Issue, IssueKind, IssueSeverity } from './graphValidation.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
 
-const ARITY: Record<TransformType, 0 | 1 | 2> = {
-	src: 0,
-	coord: 1,
-	color: 1,
-	combine: 2,
-	combineCoord: 2
-};
-
 const trimUndefTail = (xs: unknown[]) => {
 	const a = [...xs];
 	while (a.length && a[a.length - 1] === undefined) a.pop();
@@ -32,27 +24,26 @@ const trimUndefTail = (xs: unknown[]) => {
 const CAMERA_SOURCE_INDEX = 0;
 
 export class HydraEngine {
+	private readonly meta: TransformMeta;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private readonly generators: any;
+	// runtime state
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private hydra: any | null = null;
 	private canvas: HTMLCanvasElement | null = null;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private regl: any = null;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	private generators: any | null = null;
 	private isInitialized = false;
 	private onResizeHandler: (() => void) | null = null;
 
-	// Metadata caches for synchronous access
-	private arityByName = new Map<string, 0 | 1 | 2>();
-	private typeByName = new Map<string, TransformType>();
-	private inputsByName = new Map<string, string[]>();
+	constructor(meta: TransformMeta, generators: unknown) {
+		this.meta = meta;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		this.generators = generators as any;
+	}
 
 	private getTransformMeta(): TransformMeta {
-		return {
-			arityByName: this.arityByName,
-			typeByName: this.typeByName,
-			inputsByName: this.inputsByName
-		};
+		return this.meta;
 	}
 
 	private getNumOutputs(): number {
@@ -104,21 +95,7 @@ export class HydraEngine {
 
 		try {
 			// Dynamic imports to avoid SSR issues
-			const [{ Hydra, generators, defaultGenerators, defaultModifiers }, createREGL] =
-				await Promise.all([import('hydra-ts'), import('regl')]);
-
-			this.generators = generators;
-
-			// Build metadata maps from Hydra's transform definitions
-			const allTransforms = [...defaultGenerators, ...defaultModifiers];
-			for (const transform of allTransforms) {
-				this.arityByName.set(transform.name, ARITY[transform.type]);
-				this.typeByName.set(transform.name, transform.type);
-				this.inputsByName.set(
-					transform.name,
-					transform.inputs.map((i) => i.name)
-				);
-			}
+			const [{ Hydra }, createREGL] = await Promise.all([import('hydra-ts'), import('regl')]);
 
 			this.regl = createREGL.default({
 				canvas,
@@ -150,7 +127,7 @@ export class HydraEngine {
 	private validateNodeArity(node: IRNode, tType: TransformType, inputEdges: IREdge[]): Issue[] {
 		const issues: Issue[] = [];
 		void tType;
-		const want = this.arityByName.get(node.type);
+		const want = this.meta.arityByName.get(node.type);
 		const have = inputEdges.length;
 
 		if (want == null || have === want) return issues;
@@ -275,7 +252,7 @@ export class HydraEngine {
 		}
 
 		// Validate transform exists
-		const tType = this.typeByName.get(node.type);
+		const tType = this.meta.typeByName.get(node.type);
 		if (!tType) {
 			const result: BuildResult = {
 				ok: false,
@@ -297,7 +274,7 @@ export class HydraEngine {
 		const inputEdges = edges.filter((e) => e.target === nodeId);
 		const issues: Issue[] = this.validateNodeArity(node, tType, inputEdges);
 
-		const want = this.arityByName.get(node.type);
+		const want = this.meta.arityByName.get(node.type);
 		if (want != null && inputEdges.length < want) {
 			const result: BuildResult = { ok: false, issues };
 			memo.set(nodeId, result);
@@ -305,7 +282,7 @@ export class HydraEngine {
 		}
 
 		// Gather arguments
-		const allNames = this.inputsByName.get(node.type) ?? [];
+		const allNames = this.meta.inputsByName.get(node.type) ?? [];
 		const paramNames =
 			tType === 'combine' || tType === 'combineCoord'
 				? allNames.slice(1) // drop the implicit 'color' (the second chain)
