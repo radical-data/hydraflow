@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Handle, Position } from '@xyflow/svelte';
 
-	import type { Issue } from '../engine/HydraEngine.js';
+	import type { Issue } from '../engine/graphValidation.js';
 	import type { InputSchema, InputValue, NodeDefinition } from '../types.js';
 
 	let {

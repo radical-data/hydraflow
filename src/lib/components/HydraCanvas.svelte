@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 
-	import type { Issue } from '../engine/HydraEngine.js';
+	import type { GraphValidationResult } from '../engine/graphValidation.js';
 	import type { IREdge, IRNode } from '../types.js';
 
 	let {
 		nodes = [],
 		edges = [],
-		onValidationIssues
+		onValidationResult
 	} = $props<{
 		nodes?: IRNode[];
 		edges?: IREdge[];
-		onValidationIssues?: (issues: Issue[]) => void;
+		onValidationResult?: (result: GraphValidationResult) => void;
 	}>();
 
 	let canvas: HTMLCanvasElement;
@@ -55,9 +55,8 @@
 		debounceTimer = setTimeout(() => {
 			if (!engine) return;
 
-			const issues = engine.executeGraph(graphNodes, graphEdges);
-
-			onValidationIssues?.(issues);
+			const validation = engine.executeGraph(graphNodes, graphEdges);
+			onValidationResult?.(validation);
 		}, EXECUTE_DEBOUNCE_MS);
 	});
 </script>
