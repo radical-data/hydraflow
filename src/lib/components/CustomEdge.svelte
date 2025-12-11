@@ -2,11 +2,15 @@
 	import { BaseEdge, type EdgeProps, EdgeReconnectAnchor, getBezierPath } from '@xyflow/svelte';
 	import { getContext } from 'svelte';
 
+	import type { IREdge } from '../types.js';
+
 	type EdgeValidationStatus = {
 		hasError: boolean;
 		hasWarning: boolean;
 		isDead: boolean;
 	};
+
+	type EdgeById = () => Map<string, IREdge>;
 
 	let { id, sourceX, sourceY, targetX, targetY, selected }: EdgeProps = $props();
 
@@ -20,6 +24,11 @@
 	const hasWarning = $derived(!hasError && !!validationStatus?.hasWarning);
 	const isDead = $derived(!!validationStatus?.isDead);
 
+	// Delay edges represent feedback connections: previous-frame input from a Hydra output
+	const getEdgeById = getContext<EdgeById>('edgeById')!;
+	const edge = $derived(getEdgeById().get(id) ?? null);
+	const isDelayEdge = $derived(!!edge && (edge.delayFrames ?? 0) > 0);
+
 	const edgeStyle = $derived(
 		hasError
 			? 'stroke: #ef4444; stroke-width: 2px;'
@@ -27,7 +36,9 @@
 				? 'stroke: #f59e0b; stroke-width: 2px;'
 				: isDead
 					? 'stroke: #9ca3af; stroke-width: 1.5px; stroke-dasharray: 6 4; opacity: 0.5;'
-					: undefined
+					: isDelayEdge
+						? 'stroke: #6366f1; stroke-width: 1.5px; stroke-dasharray: 4 3;'
+						: undefined
 	);
 
 	const [edgePath] = $derived(

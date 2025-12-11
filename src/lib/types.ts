@@ -52,6 +52,14 @@ export interface IREdge {
 	target: string;
 	sourceHandle?: string;
 	targetHandle?: string;
+
+	/**
+	 * Number of frames of delay for this edge.
+	 * - undefined or 0 => normal edge (same frame)
+	 * - 1 => previous frame
+	 * - N => N frames ago (future extension; for now we only ever set 1)
+	 */
+	delayFrames?: number;
 }
 
 export interface PatchDocument {

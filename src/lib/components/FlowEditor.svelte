@@ -106,6 +106,7 @@
 	setContext('nodeDefinitions', () => nodeDefinitions);
 	setContext('validationByNodeId', () => validationByNodeId());
 	setContext('edgeValidationById', () => edgeValidationById());
+	setContext('edgeById', () => new Map(edges.map((e: IREdge) => [e.id, e])));
 
 	let lastIssueKeys = new Set<string>();
 
@@ -265,6 +266,92 @@
 				!deletedNodeIds.has(edge.target)
 		);
 	};
+
+	function wouldCreateCycle(
+		adjacency: Map<string, string[]>,
+		source: string,
+		target: string
+	): boolean {
+		const goal = source;
+		const stack = [target];
+		/* eslint-disable-next-line svelte/prefer-svelte-reactivity */
+		const visited = new Set<string>();
+
+		while (stack.length > 0) {
+			const current = stack.pop()!;
+			if (current === goal) return true;
+			if (visited.has(current)) continue;
+			visited.add(current);
+
+			const neighbours = adjacency.get(current) ?? [];
+			for (const n of neighbours) {
+				if (!visited.has(n)) {
+					stack.push(n);
+				}
+			}
+		}
+
+		return false;
+	}
+
+	$effect(() => {
+		// Recompute delay flags from scratch whenever edges change.
+		// Algorithm: build a DAG by marking cycle-closing edges as delay edges.
+		// Existing delay edges are ignored when detecting cycles, so cycles that already
+		// pass through a delay edge are treated as intentional feedback.
+		// Note: Order-dependent - the last edge in insertion order that closes a cycle
+		// becomes the delay edge.
+
+		if (edges.length === 0) return;
+
+		/* eslint-disable-next-line svelte/prefer-svelte-reactivity */
+		const adjacency = new Map<string, string[]>();
+		const desiredDelayFlags: number[] = [];
+
+		for (const edge of edges) {
+			// Delay edges are ignored here: they break cycles but don't participate in forward traversal
+			if (edge.delayFrames && edge.delayFrames > 0) {
+				desiredDelayFlags.push(1);
+				continue;
+			}
+
+			const makesCycle = wouldCreateCycle(adjacency, edge.source, edge.target);
+
+			if (makesCycle) {
+				// Mark this edge as delay to break the cycle
+				desiredDelayFlags.push(1);
+			} else {
+				desiredDelayFlags.push(0);
+				const list = adjacency.get(edge.source) ?? [];
+				list.push(edge.target);
+				adjacency.set(edge.source, list);
+			}
+		}
+
+		// Check if anything actually changed; if not, bail to avoid infinite reactive loops
+		let anyChanged = false;
+		for (let i = 0; i < edges.length; i++) {
+			const current = edges[i].delayFrames ?? 0;
+			if (current !== desiredDelayFlags[i]) {
+				anyChanged = true;
+				break;
+			}
+		}
+		if (!anyChanged) return;
+
+		// Apply the new delay flags immutably so Svelte change detection still works
+		edges = edges.map((edge: IREdge, i: number) => {
+			const flag = desiredDelayFlags[i];
+			if (flag === 0) {
+				// Strip stale delayFrames if present
+				if (!edge.delayFrames) return edge;
+				/* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+				const { delayFrames, ...rest } = edge;
+				return rest as IREdge;
+			}
+			return { ...edge, delayFrames: 1 };
+		});
+	});
 </script>
 
 <div class="flow-editor">

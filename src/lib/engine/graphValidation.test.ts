@@ -146,6 +146,53 @@ describe('validateGraph', () => {
 		expect(cycleIssues.some((i) => i.nodeId === 'rotate-1' || i.nodeId === 'rotate-2')).toBe(true);
 	});
 
+	it('delay edge cycle should not be reported as CYCLE error', () => {
+		const nodes: IRNode[] = [
+			{ id: 'src-1', type: 'src', data: {}, position: { x: 0, y: 0 } },
+			{ id: 'rotate-1', type: 'rotate', data: { angle: 0.5 }, position: { x: 100, y: 0 } },
+			{ id: 'rotate-2', type: 'rotate', data: { angle: 0.5 }, position: { x: 200, y: 0 } },
+			{ id: 'out-1', type: 'out', data: { outputIndex: 0 }, position: { x: 300, y: 0 } }
+		];
+
+		const edges: IREdge[] = [
+			{ id: 'e1', source: 'src-1', target: 'rotate-1' },
+			{ id: 'e2', source: 'rotate-1', target: 'rotate-2' },
+			{ id: 'e3', source: 'rotate-2', target: 'rotate-1', delayFrames: 1 },
+			{ id: 'e4', source: 'rotate-1', target: 'out-1' }
+		];
+
+		const meta = createMeta();
+		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
+
+		const cycleIssues = result.issues.filter((i) => i.kind === 'CYCLE');
+		expect(cycleIssues.length).toBe(0);
+		expect(result.nodeStatusById.get('rotate-1')?.isDead).toBe(false);
+		expect(result.nodeStatusById.get('rotate-2')?.isDead).toBe(false);
+		// Arity should still be correct (rotate expects 1 input, has 1 input)
+		expect(result.nodeStatusById.get('rotate-1')?.hasError).toBe(false);
+		expect(result.nodeStatusById.get('rotate-2')?.hasError).toBe(false);
+	});
+
+	it('unary node with only a delay input is structurally valid', () => {
+		const nodes: IRNode[] = [
+			{ id: 'src-1', type: 'src', data: {}, position: { x: 0, y: 0 } },
+			{ id: 'rotate-1', type: 'rotate', data: { angle: 0.5 }, position: { x: 100, y: 0 } },
+			{ id: 'out-1', type: 'out', data: { outputIndex: 0 }, position: { x: 200, y: 0 } }
+		];
+
+		const edges: IREdge[] = [
+			{ id: 'e1', source: 'rotate-1', target: 'rotate-1', delayFrames: 1 }, // purely feedback
+			{ id: 'e2', source: 'rotate-1', target: 'out-1' }
+		];
+
+		const meta = createMeta();
+		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
+
+		const rotateIssues = result.issues.filter((i) => i.nodeId === 'rotate-1');
+		expect(rotateIssues.some((i) => i.kind === 'NODE_MISSING_INPUTS')).toBe(false);
+		expect(result.nodeStatusById.get('rotate-1')?.hasError).toBe(false);
+	});
+
 	it('output index out of range', () => {
 		const nodes: IRNode[] = [
 			{ id: 'src-1', type: 'src', data: {}, position: { x: 0, y: 0 } },
