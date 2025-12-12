@@ -2,7 +2,7 @@
 	import { nanoid } from 'nanoid';
 	import { onMount } from 'svelte';
 
-	import { bootstrapHydraApp } from '$lib/app/bootstrapHydra.js';
+	import { bootstrapManglApp } from '$lib/app/bootstrapMangl.js';
 	import FlowEditor from '$lib/components/FlowEditor.svelte';
 	import HydraCanvas from '$lib/components/HydraCanvas.svelte';
 	import type { GraphValidationResult } from '$lib/engine/graphValidation.js';
@@ -102,7 +102,7 @@
 	let nodeDefinitions = $state<NodeDefinition[]>([]);
 
 	onMount(async () => {
-		const { engine: e, nodeDefinitions: defs } = await bootstrapHydraApp();
+		const { engine: e, nodeDefinitions: defs } = await bootstrapManglApp();
 		engine = e;
 		nodeDefinitions = defs;
 	});

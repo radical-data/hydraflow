@@ -1,4 +1,4 @@
-# HydraFlow
+# Mangl
 
 A node-based editor for building Hydra generative visuals in the browser.
 

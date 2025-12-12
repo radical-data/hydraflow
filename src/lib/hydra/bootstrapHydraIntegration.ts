@@ -6,12 +6,12 @@ import { makeCameraDefinition } from '$lib/nodes/definitions/camera.js';
 import { outDefinition } from '$lib/nodes/definitions/out.js';
 import type { NodeDefinition } from '$lib/types.js';
 
-export interface HydraAppDeps {
+export interface HydraIntegrationDeps {
 	engine: HydraEngine;
 	nodeDefinitions: NodeDefinition[];
 }
 
-export async function bootstrapHydraApp(): Promise<HydraAppDeps> {
+export async function bootstrapHydraIntegration(): Promise<HydraIntegrationDeps> {
 	const hydraModule = await import('hydra-ts');
 	const { generators, defaultGenerators, defaultModifiers } = hydraModule;
 
