@@ -6,26 +6,36 @@ import { validateGraph } from './graphValidation.js';
 
 function createMeta(): TransformMeta {
 	const arityByName = new Map<string, 0 | 1 | 2>();
-	const typeByName = new Map<string, 'src' | 'coord' | 'color' | 'combine' | 'combineCoord'>();
-	const inputsByName = new Map<string, string[]>();
+	const kindByName = new Map<string, 'src' | 'coord' | 'color' | 'combine' | 'combineCoord'>();
+	const paramIdsByName = new Map<string, string[]>();
+	const paramDefaultsByName = new Map<string, unknown[]>();
 
 	arityByName.set('src', 0);
-	typeByName.set('src', 'src');
-	inputsByName.set('src', []);
+	kindByName.set('src', 'src');
+	paramIdsByName.set('src', []);
+	paramDefaultsByName.set('src', []);
+
+	arityByName.set('osc', 0);
+	kindByName.set('osc', 'src');
+	paramIdsByName.set('osc', ['frequency', 'sync', 'offset']);
+	paramDefaultsByName.set('osc', [2, 0.5, 0]);
 
 	arityByName.set('rotate', 1);
-	typeByName.set('rotate', 'coord');
-	inputsByName.set('rotate', ['angle', 'speed']);
+	kindByName.set('rotate', 'coord');
+	paramIdsByName.set('rotate', ['angle', 'speed']);
+	paramDefaultsByName.set('rotate', [0, 0]);
 
 	arityByName.set('blend', 2);
-	typeByName.set('blend', 'combine');
-	inputsByName.set('blend', ['amount']);
+	kindByName.set('blend', 'combine');
+	paramIdsByName.set('blend', ['amount']);
+	paramDefaultsByName.set('blend', [0.5]);
 
 	arityByName.set('out', 1);
-	typeByName.set('out', 'color');
-	inputsByName.set('out', []);
+	kindByName.set('out', 'color');
+	paramIdsByName.set('out', []);
+	paramDefaultsByName.set('out', []);
 
-	return { arityByName, typeByName, inputsByName };
+	return { arityByName, kindByName, paramIdsByName, paramDefaultsByName };
 }
 
 describe('validateGraph', () => {
@@ -227,5 +237,96 @@ describe('validateGraph', () => {
 		const issue = outIssues.find((i) => i.kind === 'OUTPUT_ARITY');
 		expect(issue?.message).toContain('exactly 1 input');
 		expect(issue?.message).toContain('found 0');
+	});
+
+	it('unknown node.data key emits validation warning', () => {
+		const nodes: IRNode[] = [
+			{ id: 'osc-1', type: 'osc', data: { freq: 2 }, position: { x: 0, y: 0 } },
+			{ id: 'out-1', type: 'out', data: { outputIndex: 0 }, position: { x: 100, y: 0 } }
+		];
+
+		const edges: IREdge[] = [{ id: 'e1', source: 'osc-1', target: 'out-1' }];
+
+		const meta = createMeta();
+		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
+
+		const unknownKeyIssues = result.issues.filter(
+			(i) => i.kind === 'UNKNOWN_NODE_DATA_KEY' && i.nodeId === 'osc-1'
+		);
+		expect(unknownKeyIssues.length).toBeGreaterThan(0);
+		expect(unknownKeyIssues[0].severity).toBe('warning');
+		expect(unknownKeyIssues[0].message).toContain('osc-1');
+		expect(unknownKeyIssues[0].message).toContain('freq');
+	});
+
+	it('UNKNOWN_NODE_DATA_KEY expected list is stable (sorted)', () => {
+		const nodes: IRNode[] = [
+			{ id: 'osc-1', type: 'osc', data: { freq: 2 }, position: { x: 0, y: 0 } },
+			{ id: 'out-1', type: 'out', data: { outputIndex: 0 }, position: { x: 100, y: 0 } }
+		];
+
+		const edges: IREdge[] = [{ id: 'e1', source: 'osc-1', target: 'out-1' }];
+
+		const meta = createMeta();
+		const result1 = validateGraph({ nodes, edges, numOutputs: 4, meta });
+		const result2 = validateGraph({ nodes, edges, numOutputs: 4, meta });
+
+		const issue1 = result1.issues.find(
+			(i) => i.kind === 'UNKNOWN_NODE_DATA_KEY' && i.nodeId === 'osc-1'
+		);
+		const issue2 = result2.issues.find(
+			(i) => i.kind === 'UNKNOWN_NODE_DATA_KEY' && i.nodeId === 'osc-1'
+		);
+
+		expect(issue1).toBeDefined();
+		expect(issue2).toBeDefined();
+		// Expected list should be stable (sorted alphabetically)
+		expect(issue1?.message).toBe(issue2?.message);
+		// Should contain sorted param names
+		expect(issue1?.message).toContain('frequency, offset, sync');
+	});
+
+	it('outputIndex is allowed for out nodes', () => {
+		const nodes: IRNode[] = [
+			{ id: 'out-1', type: 'out', data: { outputIndex: 0 }, position: { x: 100, y: 0 } }
+		];
+
+		const edges: IREdge[] = [];
+
+		const meta = createMeta();
+		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
+
+		const unknownKeyIssues = result.issues.filter(
+			(i) => i.kind === 'UNKNOWN_NODE_DATA_KEY' && i.nodeId === 'out-1'
+		);
+		expect(unknownKeyIssues.length).toBe(0);
+	});
+
+	it('unknown node type does not emit UNKNOWN_NODE_DATA_KEY warnings', () => {
+		const nodes: IRNode[] = [
+			{
+				id: 'unknown-1',
+				type: 'nonexistent',
+				data: { someKey: 123 },
+				position: { x: 0, y: 0 }
+			},
+			{ id: 'out-1', type: 'out', data: { outputIndex: 0 }, position: { x: 100, y: 0 } }
+		];
+
+		const edges: IREdge[] = [{ id: 'e1', source: 'unknown-1', target: 'out-1' }];
+
+		const meta = createMeta();
+		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
+
+		// Should have UNKNOWN_TRANSFORM error, not UNKNOWN_NODE_DATA_KEY warnings
+		const unknownTransformIssues = result.issues.filter(
+			(i) => i.kind === 'UNKNOWN_TRANSFORM' && i.nodeId === 'unknown-1'
+		);
+		expect(unknownTransformIssues.length).toBeGreaterThan(0);
+
+		const unknownKeyIssues = result.issues.filter(
+			(i) => i.kind === 'UNKNOWN_NODE_DATA_KEY' && i.nodeId === 'unknown-1'
+		);
+		expect(unknownKeyIssues.length).toBe(0);
 	});
 });

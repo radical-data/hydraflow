@@ -6,32 +6,37 @@ import { HydraEngine } from './HydraEngine.js';
 
 function createMeta(): TransformMeta {
 	const arityByName = new Map<string, 0 | 1 | 2>();
-	const typeByName = new Map<string, 'src' | 'coord' | 'color' | 'combine' | 'combineCoord'>();
-	const inputsByName = new Map<string, string[]>();
+	const kindByName = new Map<string, 'src' | 'coord' | 'color' | 'combine' | 'combineCoord'>();
+	const paramIdsByName = new Map<string, string[]>();
+	const paramDefaultsByName = new Map<string, unknown[]>();
 
 	arityByName.set('osc', 0);
-	typeByName.set('osc', 'src');
-	inputsByName.set('osc', ['frequency', 'sync', 'offset']);
+	kindByName.set('osc', 'src');
+	paramIdsByName.set('osc', ['frequency', 'sync', 'offset']);
+	paramDefaultsByName.set('osc', [2, 0.5, 0]);
 
 	arityByName.set('rotate', 1);
-	typeByName.set('rotate', 'coord');
-	inputsByName.set('rotate', ['angle', 'speed']);
+	kindByName.set('rotate', 'coord');
+	paramIdsByName.set('rotate', ['angle', 'speed']);
+	paramDefaultsByName.set('rotate', [0, 0]);
 
 	arityByName.set('blend', 2);
-	typeByName.set('blend', 'combine');
-	inputsByName.set('blend', ['amount']);
+	kindByName.set('blend', 'combine');
+	paramIdsByName.set('blend', ['amount']);
+	paramDefaultsByName.set('blend', [0.5]);
 
 	arityByName.set('out', 1);
-	typeByName.set('out', 'color');
-	inputsByName.set('out', []);
+	kindByName.set('out', 'color');
+	paramIdsByName.set('out', []);
+	paramDefaultsByName.set('out', []);
 
-	return { arityByName, typeByName, inputsByName };
+	return { arityByName, kindByName, paramIdsByName, paramDefaultsByName };
 }
 
 // Fake chain objects for testing
 type FakeChain = {
 	kind: string;
-	transforms: Array<{ op: string; args: unknown[] }>;
+	transforms: Array<{ op: string; otherChain?: FakeChain; args: unknown[] }>;
 	outputIndex?: number;
 	input?: FakeChain;
 	input0?: FakeChain;
@@ -55,7 +60,8 @@ function createFakeGenerators() {
 			blend: function (this: FakeChain, other: FakeChain, ...args: unknown[]) {
 				this.input0 = this;
 				this.input1 = other;
-				this.transforms.push({ op: 'blend', args });
+				// Record the full call signature: other chain + user args
+				this.transforms.push({ op: 'blend', otherChain: other, args });
 				return this;
 			},
 			out: function () {
@@ -298,5 +304,54 @@ describe('HydraEngine feedback', () => {
 		);
 		expect(runtimeErrors.length).toBeGreaterThan(0);
 		expect(runtimeErrors[0].message).toContain('src');
+	});
+
+	it('mixer params are not dropped and implicit chain param is not in args', async () => {
+		const meta = createMeta();
+		const { generators, chains } = createFakeGenerators();
+		const engine = new HydraEngine(meta, generators);
+
+		const fakeHydra = createFakeHydra();
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(engine as any).hydra = fakeHydra;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(engine as any).isInitialized = true;
+
+		const nodes: IRNode[] = [
+			{ id: 'osc-1', type: 'osc', data: { frequency: 2 }, position: { x: 0, y: 0 } },
+			{ id: 'osc-2', type: 'osc', data: { frequency: 3 }, position: { x: 0, y: 50 } },
+			{ id: 'blend-1', type: 'blend', data: { amount: 0.25 }, position: { x: 100, y: 0 } },
+			{ id: 'out-1', type: 'out', data: { outputIndex: 0 }, position: { x: 200, y: 0 } }
+		];
+
+		const edges: IREdge[] = [
+			{ id: 'e1', source: 'osc-1', target: 'blend-1', targetHandle: 'input-0' },
+			{ id: 'e2', source: 'osc-2', target: 'blend-1', targetHandle: 'input-1' },
+			{ id: 'e3', source: 'blend-1', target: 'out-1' }
+		];
+
+		const result = engine.executeGraph(nodes, edges);
+
+		expect(result.issues.length).toBe(0);
+
+		// Find the blend transform call
+		const blendCalls = chains.flatMap((c) => c.transforms).filter((t) => t.op === 'blend');
+
+		expect(blendCalls.length).toBeGreaterThan(0);
+		const blendCall = blendCalls[0];
+
+		// Verify the call signature: blend(otherChain, amount)
+		// 1. The first argument must be the "other chain" (input-1, which is osc-2)
+		expect(blendCall.otherChain).toBeDefined();
+		expect(blendCall.otherChain?.kind).toBe('osc');
+
+		// 2. The args array must contain ONLY user params: [0.25]
+		// This test would fail if the implicit chain param leaked into args
+		expect(blendCall.args.length).toBe(1);
+		expect(blendCall.args[0]).toBe(0.25);
+
+		// 3. Verify the args array does NOT contain the implicit chain param
+		// (If it did, args.length would be > 1 or args[0] would be a chain object)
+		expect(typeof blendCall.args[0]).toBe('number');
 	});
 });

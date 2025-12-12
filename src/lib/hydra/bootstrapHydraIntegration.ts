@@ -1,7 +1,12 @@
 import { HydraEngine } from '$lib/engine/HydraEngine.js';
-import { buildTransformSpecs } from '$lib/engine/transformsCatalog.js';
-import { buildTransformMetaFromSpecs } from '$lib/engine/transformSpec.js';
-import { autoDefineFromHydra, overrideDefinition } from '$lib/nodes/auto-definitions.js';
+import {
+	addCustomSpecsForMeta,
+	assertSpecsValid,
+	buildHydraTransformSpecs,
+	buildMetaFromSpecs,
+	buildNodeDefinitionsFromSpecs,
+	type Overrides
+} from '$lib/engine/transformRegistry.js';
 import { makeCameraDefinition } from '$lib/nodes/definitions/camera.js';
 import { outDefinition } from '$lib/nodes/definitions/out.js';
 import type { NodeDefinition } from '$lib/types.js';
@@ -17,138 +22,69 @@ export async function bootstrapHydraIntegration(): Promise<HydraIntegrationDeps>
 
 	const hydraTransforms = [...defaultGenerators, ...defaultModifiers];
 
-	// Specs are now built from the same transform list we pass to the engine
-	const specs = buildTransformSpecs(hydraTransforms);
-	const meta = buildTransformMetaFromSpecs(specs);
+	// Define overrides at spec level
+	const overrides: Overrides = {
+		osc: {
+			label: 'Oscillator',
+			params: {
+				frequency: { label: 'Frequency', default: 2, min: 0, max: 20, step: 0.1 },
+				sync: { label: 'Sync', default: 0.5, min: 0, max: 2, step: 0.01 },
+				offset: { label: 'Offset', default: 0, min: 0, max: 2, step: 0.01 }
+			}
+		},
+		rotate: {
+			label: 'Rotate',
+			params: {
+				angle: { label: 'Angle', default: 0, min: -Math.PI * 2, max: Math.PI * 2, step: 0.01 },
+				speed: { label: 'Speed', default: 0, min: -5, max: 5, step: 0.01 }
+			}
+		},
+		kaleid: {
+			label: 'Kaleidoscope'
+		},
+		brightness: {
+			params: {
+				amount: { label: 'Amount', default: 0.4, min: -1, max: 1, step: 0.01 }
+			}
+		},
+		contrast: {
+			params: {
+				amount: { label: 'Amount', default: 1.6, min: 0, max: 5, step: 0.1 }
+			}
+		},
+		saturate: {
+			params: {
+				amount: { label: 'Amount', default: 2.0, min: 0, max: 5, step: 0.1 }
+			}
+		}
+	};
+
+	// Build specs from Hydra transforms with overrides applied
+	// (override validation happens inside buildHydraTransformSpecs)
+	const hydraSpecs = buildHydraTransformSpecs(hydraTransforms, overrides);
+
+	// Add custom transform specs (camera, out) for meta/validation only
+	// Note: These populate meta; UI definitions come from makeCameraDefinition/outDefinition
+	const metaSpecs = addCustomSpecsForMeta(hydraSpecs);
+
+	// Assert specs are valid
+	assertSpecsValid(metaSpecs, hydraTransforms);
+
+	// Build meta from metaSpecs (includes camera/out for validation/runtime)
+	const meta = buildMetaFromSpecs(metaSpecs);
+
+	// Create engine
 	const engine = new HydraEngine(meta, generators);
 
-	const nodeDefs: NodeDefinition[] = [];
+	// Build node definitions from hydraSpecs only (excludes meta-only specs)
+	const nodeDefs = buildNodeDefinitionsFromSpecs(hydraSpecs);
 
-	for (const spec of specs) {
-		if (spec.id === 'camera') {
-			nodeDefs.push(makeCameraDefinition(spec));
-			continue;
-		}
-
-		const transform = hydraTransforms.find((t) => t.name === spec.id);
-		if (!transform) continue;
-
-		nodeDefs.push(autoDefineFromHydra(transform, spec));
-	}
-
-	// Apply overrides (osc, rotate, brightness, etc.)
-	const nodeDefsMap = new Map(nodeDefs.map((d) => [d.id, d]));
-
-	// Override osc
-	const oscDef = nodeDefsMap.get('osc');
-	if (oscDef) {
-		nodeDefsMap.set(
-			'osc',
-			overrideDefinition(oscDef, {
-				label: 'Oscillator',
-				inputs: [
-					{
-						id: 'frequency',
-						label: 'Frequency',
-						type: 'number',
-						default: 2,
-						min: 0,
-						max: 20,
-						step: 0.1
-					},
-					{ id: 'sync', label: 'Sync', type: 'number', default: 0.5, min: 0, max: 2, step: 0.01 },
-					{ id: 'offset', label: 'Offset', type: 'number', default: 0, min: 0, max: 2, step: 0.01 }
-				]
-			})
-		);
-	}
-
-	// Override rotate
-	const rotateDef = nodeDefsMap.get('rotate');
-	if (rotateDef) {
-		nodeDefsMap.set(
-			'rotate',
-			overrideDefinition(rotateDef, {
-				label: 'Rotate',
-				inputs: [
-					{
-						id: 'angle',
-						label: 'Angle',
-						type: 'number',
-						default: 0,
-						min: -Math.PI * 2,
-						max: Math.PI * 2,
-						step: 0.01
-					},
-					{ id: 'speed', label: 'Speed', type: 'number', default: 0, min: -5, max: 5, step: 0.01 }
-				]
-			})
-		);
-	}
-
-	// Override kaleid
-	const kaleidDef = nodeDefsMap.get('kaleid');
-	if (kaleidDef) {
-		nodeDefsMap.set(
-			'kaleid',
-			overrideDefinition(kaleidDef, {
-				label: 'Kaleidoscope'
-			})
-		);
-	}
-
-	// Override brightness
-	const brightnessDef = nodeDefsMap.get('brightness');
-	if (brightnessDef) {
-		nodeDefsMap.set(
-			'brightness',
-			overrideDefinition(brightnessDef, {
-				inputs: [
-					{
-						id: 'amount',
-						label: 'Amount',
-						type: 'number',
-						default: 0.4,
-						min: -1,
-						max: 1,
-						step: 0.01
-					}
-				]
-			})
-		);
-	}
-
-	// Override contrast
-	const contrastDef = nodeDefsMap.get('contrast');
-	if (contrastDef) {
-		nodeDefsMap.set(
-			'contrast',
-			overrideDefinition(contrastDef, {
-				inputs: [
-					{ id: 'amount', label: 'Amount', type: 'number', default: 1.6, min: 0, max: 5, step: 0.1 }
-				]
-			})
-		);
-	}
-
-	// Override saturate
-	const saturateDef = nodeDefsMap.get('saturate');
-	if (saturateDef) {
-		nodeDefsMap.set(
-			'saturate',
-			overrideDefinition(saturateDef, {
-				inputs: [
-					{ id: 'amount', label: 'Amount', type: 'number', default: 2.0, min: 0, max: 5, step: 0.1 }
-				]
-			})
-		);
-	}
-
-	// Add out definition
-	nodeDefsMap.set('out', outDefinition);
+	// Add special node definitions (hand-authored, not generated from specs)
+	nodeDefs.push(makeCameraDefinition());
+	nodeDefs.push(outDefinition);
 
 	return {
 		engine,
-		nodeDefinitions: Array.from(nodeDefsMap.values())
+		nodeDefinitions: nodeDefs
 	};
 }

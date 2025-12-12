@@ -309,7 +309,59 @@ export class HydraEngine {
 			return result;
 		}
 
-		const tType = this.meta.typeByName.get(node.type);
+		// Out is a sink node: it exists in meta for validation/runtime reasoning,
+		// but execution routing is handled in executeGraph(). Here we just pass through
+		// the upstream chain without calling any transform method.
+		if (node.type === 'out') {
+			const inputEdges = edges.filter((e) => e.target === nodeId);
+			const forwardInputs = inputEdges.filter((e) => !isFeedbackEdge(e));
+
+			if (forwardInputs.length !== 1) {
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id, outputIndex]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message: `Output node ${node.id} expects exactly 1 input at runtime, found ${forwardInputs.length}`,
+							nodeId: node.id,
+							outputIndex
+						}
+					]
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			// Recurse to build the upstream chain (out is a sink, not a transform)
+			const inputEdge = forwardInputs[0];
+			const upstreamResult = this.buildChainValidated(
+				nodes,
+				edges,
+				inputEdge.source,
+				outputIndex,
+				nodeById,
+				new Set([...stack, nodeId]),
+				memo
+			);
+
+			if (!upstreamResult.ok) {
+				const result: BuildResult = {
+					ok: false,
+					issues: upstreamResult.issues
+				};
+				memo.set(nodeId, result);
+				return result;
+			}
+
+			// Return the upstream chain without calling any transform method for out
+			const result: BuildResult = { ok: true, chain: upstreamResult.chain };
+			memo.set(nodeId, result);
+			return result;
+		}
+
+		const tType = this.meta.kindByName.get(node.type);
 		if (!tType) {
 			const result: BuildResult = {
 				ok: false,
@@ -334,13 +386,9 @@ export class HydraEngine {
 
 		const issues: Issue[] = [];
 
-		const allNames = this.meta.inputsByName.get(node.type) ?? [];
-		const paramNames =
-			tType === 'combine' || tType === 'combineCoord'
-				? allNames.slice(1) // drop the implicit 'color' chain parameter
-				: allNames;
-
-		const rawArgs = paramNames.map((k: string) => (node.data ?? {})[k]);
+		const ids = this.meta.paramIdsByName.get(node.type) ?? [];
+		const defaults = this.meta.paramDefaultsByName.get(node.type) ?? [];
+		const rawArgs = ids.map((id, i) => node.data?.[id] ?? defaults[i]);
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		let chain: any = null;
