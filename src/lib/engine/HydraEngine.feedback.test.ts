@@ -1,115 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IREdge, IRNode } from '../types.js';
-import type { TransformMeta } from './graphValidation.js';
+import {
+	createFakeGeneratorsForFeedback,
+	createFakeHydraOutputsOnly
+} from './__testutils__/fakeHydra.js';
+import { createTestMeta } from './__testutils__/meta.js';
 import { HydraEngine } from './HydraEngine.js';
-
-function createMeta(): TransformMeta {
-	const arityByName = new Map<string, 0 | 1 | 2>();
-	const kindByName = new Map<string, 'src' | 'coord' | 'color' | 'combine' | 'combineCoord'>();
-	const paramIdsByName = new Map<string, string[]>();
-	const paramDefaultsByName = new Map<string, unknown[]>();
-
-	arityByName.set('osc', 0);
-	kindByName.set('osc', 'src');
-	paramIdsByName.set('osc', ['frequency', 'sync', 'offset']);
-	paramDefaultsByName.set('osc', [2, 0.5, 0]);
-
-	arityByName.set('rotate', 1);
-	kindByName.set('rotate', 'coord');
-	paramIdsByName.set('rotate', ['angle', 'speed']);
-	paramDefaultsByName.set('rotate', [0, 0]);
-
-	arityByName.set('blend', 2);
-	kindByName.set('blend', 'combine');
-	paramIdsByName.set('blend', ['amount']);
-	paramDefaultsByName.set('blend', [0.5]);
-
-	arityByName.set('out', 1);
-	kindByName.set('out', 'color');
-	paramIdsByName.set('out', []);
-	paramDefaultsByName.set('out', []);
-
-	return { arityByName, kindByName, paramIdsByName, paramDefaultsByName };
-}
-
-// Fake chain objects for testing
-type FakeChain = {
-	kind: string;
-	transforms: Array<{ op: string; otherChain?: FakeChain; args: unknown[] }>;
-	outputIndex?: number;
-	input?: FakeChain;
-	input0?: FakeChain;
-	input1?: FakeChain;
-	rotate: (this: FakeChain, ...args: unknown[]) => FakeChain;
-	blend: (this: FakeChain, other: FakeChain, ...args: unknown[]) => FakeChain;
-	[key: string]: unknown;
-};
-
-function createFakeGenerators() {
-	const chains: FakeChain[] = [];
-
-	const makeChain = (kind: string): FakeChain => {
-		const chain: FakeChain = {
-			kind,
-			transforms: [],
-			rotate: function (this: FakeChain, ...args: unknown[]) {
-				this.transforms.push({ op: 'rotate', args });
-				return this;
-			},
-			blend: function (this: FakeChain, other: FakeChain, ...args: unknown[]) {
-				this.input0 = this;
-				this.input1 = other;
-				// Record the full call signature: other chain + user args
-				this.transforms.push({ op: 'blend', otherChain: other, args });
-				return this;
-			},
-			out: function () {
-				// Mock out method to avoid execution errors
-				return this;
-			}
-		};
-		chains.push(chain);
-		return chain;
-	};
-
-	const generators = {
-		osc: (...args: unknown[]) => {
-			const chain = makeChain('osc');
-			chain.transforms.push({ op: 'osc', args });
-			return chain;
-		},
-		src: (output: { index?: number }) => {
-			const chain = makeChain('src');
-			chain.outputIndex = output.index ?? 0;
-			chain.transforms.push({ op: 'src', args: [output] });
-			return chain;
-		}
-	};
-
-	return { generators, chains };
-}
-
-function createFakeHydra(outputCount = 4) {
-	const outputs = Array.from({ length: outputCount }, (_, i) => ({ index: i }));
-	return {
-		outputs,
-		loop: {
-			start: () => {},
-			stop: () => {}
-		},
-		hush: () => {},
-		setResolution: () => {}
-	};
-}
 
 describe('HydraEngine feedback', () => {
 	it('unary forward + feedback cycle', async () => {
-		const meta = createMeta();
-		const { generators, chains } = createFakeGenerators();
+		const meta = createTestMeta();
+		const { generators, chains } = createFakeGeneratorsForFeedback();
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraOutputsOnly();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,11 +47,11 @@ describe('HydraEngine feedback', () => {
 	});
 
 	it('unary feedback-only node', async () => {
-		const meta = createMeta();
-		const { generators, chains } = createFakeGenerators();
+		const meta = createTestMeta();
+		const { generators, chains } = createFakeGeneratorsForFeedback();
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraOutputsOnly();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,11 +82,11 @@ describe('HydraEngine feedback', () => {
 	});
 
 	it('binary node mixed inputs', async () => {
-		const meta = createMeta();
-		const { generators, chains } = createFakeGenerators();
+		const meta = createTestMeta();
+		const { generators, chains } = createFakeGeneratorsForFeedback();
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraOutputsOnly();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -216,11 +121,11 @@ describe('HydraEngine feedback', () => {
 	});
 
 	it('binary node pure feedback', async () => {
-		const meta = createMeta();
-		const { generators, chains } = createFakeGenerators();
+		const meta = createTestMeta();
+		const { generators, chains } = createFakeGeneratorsForFeedback();
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraOutputsOnly();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -267,7 +172,7 @@ describe('HydraEngine feedback', () => {
 	});
 
 	it('runtime error when src generator unavailable', async () => {
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const generators = {
 			osc: () => ({ transforms: [] }),
 			rotate: function () {
@@ -280,7 +185,7 @@ describe('HydraEngine feedback', () => {
 		};
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraOutputsOnly();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -307,11 +212,11 @@ describe('HydraEngine feedback', () => {
 	});
 
 	it('mixer params are not dropped and implicit chain param is not in args', async () => {
-		const meta = createMeta();
-		const { generators, chains } = createFakeGenerators();
+		const meta = createTestMeta();
+		const { generators, chains } = createFakeGeneratorsForFeedback();
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraOutputsOnly();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any

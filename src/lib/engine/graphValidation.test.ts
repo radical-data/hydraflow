@@ -1,42 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IREdge, IRNode } from '../types.js';
-import type { TransformMeta } from './graphValidation.js';
+import { createTestMeta } from './__testutils__/meta.js';
 import { validateGraph } from './graphValidation.js';
-
-function createMeta(): TransformMeta {
-	const arityByName = new Map<string, 0 | 1 | 2>();
-	const kindByName = new Map<string, 'src' | 'coord' | 'color' | 'combine' | 'combineCoord'>();
-	const paramIdsByName = new Map<string, string[]>();
-	const paramDefaultsByName = new Map<string, unknown[]>();
-
-	arityByName.set('src', 0);
-	kindByName.set('src', 'src');
-	paramIdsByName.set('src', []);
-	paramDefaultsByName.set('src', []);
-
-	arityByName.set('osc', 0);
-	kindByName.set('osc', 'src');
-	paramIdsByName.set('osc', ['frequency', 'sync', 'offset']);
-	paramDefaultsByName.set('osc', [2, 0.5, 0]);
-
-	arityByName.set('rotate', 1);
-	kindByName.set('rotate', 'coord');
-	paramIdsByName.set('rotate', ['angle', 'speed']);
-	paramDefaultsByName.set('rotate', [0, 0]);
-
-	arityByName.set('blend', 2);
-	kindByName.set('blend', 'combine');
-	paramIdsByName.set('blend', ['amount']);
-	paramDefaultsByName.set('blend', [0.5]);
-
-	arityByName.set('out', 1);
-	kindByName.set('out', 'color');
-	paramIdsByName.set('out', []);
-	paramDefaultsByName.set('out', []);
-
-	return { arityByName, kindByName, paramIdsByName, paramDefaultsByName };
-}
 
 describe('validateGraph', () => {
 	it('single linear graph: no issues, all live', () => {
@@ -51,7 +17,7 @@ describe('validateGraph', () => {
 			{ id: 'e2', source: 'rotate-1', target: 'out-1' }
 		];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		expect(result.issues.length).toBe(0);
@@ -77,7 +43,7 @@ describe('validateGraph', () => {
 			{ id: 'e3', source: 'noise-1', target: 'other-1' }
 		];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		expect(result.nodeStatusById.get('src-1')?.isDead).toBe(false);
@@ -101,7 +67,7 @@ describe('validateGraph', () => {
 			{ id: 'e2', source: 'blend-1', target: 'out-1' }
 		];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const blendIssues = result.issues.filter((i) => i.nodeId === 'blend-1');
@@ -124,7 +90,7 @@ describe('validateGraph', () => {
 			{ id: 'e3', source: 'rotate-1', target: 'out-1' }
 		];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const rotateIssues = result.issues.filter((i) => i.nodeId === 'rotate-1');
@@ -148,7 +114,7 @@ describe('validateGraph', () => {
 			{ id: 'e4', source: 'rotate-1', target: 'out-1' }
 		];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const cycleIssues = result.issues.filter((i) => i.kind === 'CYCLE');
@@ -171,7 +137,7 @@ describe('validateGraph', () => {
 			{ id: 'e4', source: 'rotate-1', target: 'out-1' }
 		];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const cycleIssues = result.issues.filter((i) => i.kind === 'CYCLE');
@@ -195,7 +161,7 @@ describe('validateGraph', () => {
 			{ id: 'e2', source: 'rotate-1', target: 'out-1' }
 		];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const rotateIssues = result.issues.filter((i) => i.nodeId === 'rotate-1');
@@ -211,7 +177,7 @@ describe('validateGraph', () => {
 
 		const edges: IREdge[] = [{ id: 'e1', source: 'src-1', target: 'out-1' }];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const outIssues = result.issues.filter((i) => i.nodeId === 'out-1');
@@ -229,7 +195,7 @@ describe('validateGraph', () => {
 
 		const edges: IREdge[] = [];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const outIssues = result.issues.filter((i) => i.nodeId === 'out-1');
@@ -247,7 +213,7 @@ describe('validateGraph', () => {
 
 		const edges: IREdge[] = [{ id: 'e1', source: 'osc-1', target: 'out-1' }];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const unknownKeyIssues = result.issues.filter(
@@ -267,7 +233,7 @@ describe('validateGraph', () => {
 
 		const edges: IREdge[] = [{ id: 'e1', source: 'osc-1', target: 'out-1' }];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result1 = validateGraph({ nodes, edges, numOutputs: 4, meta });
 		const result2 = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
@@ -293,7 +259,7 @@ describe('validateGraph', () => {
 
 		const edges: IREdge[] = [];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		const unknownKeyIssues = result.issues.filter(
@@ -315,7 +281,7 @@ describe('validateGraph', () => {
 
 		const edges: IREdge[] = [{ id: 'e1', source: 'unknown-1', target: 'out-1' }];
 
-		const meta = createMeta();
+		const meta = createTestMeta();
 		const result = validateGraph({ nodes, edges, numOutputs: 4, meta });
 
 		// Should have UNKNOWN_TRANSFORM error, not UNKNOWN_NODE_DATA_KEY warnings
