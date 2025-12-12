@@ -18,10 +18,5 @@ export const outDefinition: NodeDefinition = {
 			]
 		}
 	],
-	outputs: [],
-	build: (ctx, args) => {
-		const { outputs } = ctx;
-		const outputIndex = Number(args.outputIndex) || 0;
-		return outputs[outputIndex];
-	}
+	outputs: []
 };

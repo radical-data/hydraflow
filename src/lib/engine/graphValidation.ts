@@ -10,7 +10,8 @@ export type IssueKind =
 	| 'NODE_EXTRA_INPUTS'
 	| 'OUTPUT_INDEX_OUT_OF_RANGE'
 	| 'OUTPUT_ARITY'
-	| 'RUNTIME_EXECUTION_ERROR';
+	| 'RUNTIME_EXECUTION_ERROR'
+	| 'UNKNOWN_NODE_DATA_KEY';
 
 export type Issue = {
 	key: string;
@@ -44,12 +45,13 @@ export interface GraphValidationResult {
 	reachableEdges: Set<string>;
 }
 
-export type TransformType = 'src' | 'coord' | 'color' | 'combine' | 'combineCoord';
+export type TransformKind = 'src' | 'coord' | 'color' | 'combine' | 'combineCoord';
 
 export interface TransformMeta {
 	arityByName: Map<string, 0 | 1 | 2>;
-	typeByName: Map<string, TransformType>;
-	inputsByName: Map<string, string[]>;
+	kindByName: Map<string, TransformKind>;
+	paramIdsByName: Map<string, string[]>;
+	paramDefaultsByName: Map<string, unknown[]>;
 }
 
 export interface GraphValidationParams {
@@ -215,11 +217,40 @@ export function validateGraph(params: GraphValidationParams): GraphValidationRes
 		}
 	}
 
-	const { arityByName, typeByName } = meta;
+	const { arityByName, kindByName, paramIdsByName } = meta;
+
+	// Validate unknown node.data keys
+	for (const node of nodes) {
+		// Skip unknown node types - let the "unknown transform" error be the primary signal
+		if (!kindByName.has(node.type)) continue;
+
+		const allowedKeys = new Set(paramIdsByName.get(node.type) ?? []);
+		// UI-only keys (not in paramIdsByName, but valid for node.data):
+		// - out.outputIndex: selects which Hydra output to write to
+		// Add additional UI-only keys here if they exist in the future
+		if (node.type === 'out') {
+			allowedKeys.add('outputIndex');
+		}
+
+		const nodeData = node.data ?? {};
+		for (const key of Object.keys(nodeData)) {
+			if (!allowedKeys.has(key)) {
+				// Sort for stable output
+				const expectedList = Array.from(allowedKeys).sort().join(', ');
+				addIssue({
+					key: makeIssueKey('UNKNOWN_NODE_DATA_KEY', [node.id, key]),
+					kind: 'UNKNOWN_NODE_DATA_KEY',
+					severity: 'warning',
+					message: `Node ${node.id} has unknown parameter "${key}" (expected: ${expectedList})`,
+					nodeId: node.id
+				});
+			}
+		}
+	}
 
 	function validateNodeInputArity(
 		node: IRNode,
-		tType: TransformType,
+		tType: TransformKind,
 		inputEdges: IREdge[]
 	): Issue[] {
 		const want = arityByName.get(node.type);
@@ -286,7 +317,7 @@ export function validateGraph(params: GraphValidationParams): GraphValidationRes
 			return result;
 		}
 
-		const tType = typeByName.get(node.type);
+		const tType = kindByName.get(node.type);
 		if (!tType) {
 			const result: BuildResult = {
 				ok: false,
