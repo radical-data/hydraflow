@@ -73,8 +73,8 @@ export function dedupeIssues(all: Issue[]): Issue[] {
 	return Array.from(byKey.values());
 }
 
-export function isDelayEdge(edge: IREdge): boolean {
-	return (edge.delayFrames ?? 0) > 0;
+export function isFeedbackEdge(edge: IREdge): boolean {
+	return edge.isFeedback === true;
 }
 
 export interface ReachabilityResult {
@@ -253,7 +253,7 @@ export function validateGraph(params: GraphValidationParams): GraphValidationRes
 						key: makeIssueKey('CYCLE', [nodeId]),
 						kind: 'CYCLE',
 						severity: 'error',
-						message: `Cycle detected involving node ${nodeId}`,
+						message: `Same-frame cycle detected involving node ${nodeId} (feedback edges break cycles)`,
 						nodeId
 					}
 				]
@@ -328,14 +328,14 @@ export function validateGraph(params: GraphValidationParams): GraphValidationRes
 
 		if (tType === 'coord' || tType === 'color') {
 			for (const inputEdge of sortedInputs) {
-				if (isDelayEdge(inputEdge)) continue; // do not follow delays when checking for cycles
+				if (isFeedbackEdge(inputEdge)) continue; // feedback edges break cycles
 				const res = validateNodeChain(inputEdge.source, newStack);
 				if (!res.ok) childIssues.push(...res.issues);
 			}
 		} else if (tType === 'combine' || tType === 'combineCoord') {
-			const nonDelaySortedInputs = sortedInputs.filter((e) => !isDelayEdge(e));
-			for (let i = 0; i < Math.min(2, nonDelaySortedInputs.length); i++) {
-				const res = validateNodeChain(nonDelaySortedInputs[i].source, newStack);
+			const nonFeedbackSortedInputs = sortedInputs.filter((e) => !isFeedbackEdge(e));
+			for (let i = 0; i < Math.min(2, nonFeedbackSortedInputs.length); i++) {
+				const res = validateNodeChain(nonFeedbackSortedInputs[i].source, newStack);
 				if (!res.ok) childIssues.push(...res.issues);
 			}
 		}

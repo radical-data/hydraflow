@@ -2,7 +2,7 @@ import type { IREdge, IRNode } from '../types.js';
 import {
 	dedupeIssues,
 	type GraphValidationResult,
-	isDelayEdge,
+	isFeedbackEdge,
 	type Issue,
 	makeIssueKey,
 	rebuildGraphValidationResult,
@@ -13,10 +13,10 @@ import {
 export type { Issue, IssueKind, IssueSeverity } from './graphValidation.js';
 
 /**
- * Delay edges (edge.delayFrames > 0) represent previous-frame feedback from Hydra outputs.
- * - Delay edges count towards node arity but don't participate in cycle detection.
- * - At runtime, delay edges become src(o_k) feedback chains where k is the output index.
- * - Feedback is per output: when building the chain for output k, all delay edges read from src(o_k).
+ * Feedback edges (edge.isFeedback === true) read the previous frame from the current output.
+ * - Feedback edges count towards node arity but don't participate in same-frame cycle detection.
+ * - At runtime, feedback edges become src(o_k) chains where k is the output index.
+ * - Feedback is per output: when building the chain for output k, all feedback edges read from src(o_k).
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -230,7 +230,7 @@ export class HydraEngine {
 						key: makeIssueKey('CYCLE', [nodeId]),
 						kind: 'CYCLE',
 						severity: 'error',
-						message: `Cycle detected involving node ${nodeId}`,
+						message: `Same-frame cycle detected involving node ${nodeId} (feedback edges break cycles)`,
 						nodeId
 					}
 				]
@@ -327,10 +327,10 @@ export class HydraEngine {
 			return result;
 		}
 
-		// Split inputs into forward vs delay
+		// Split inputs into forward vs feedback
 		const inputEdges = edges.filter((e) => e.target === nodeId);
-		const forwardInputs = inputEdges.filter((e) => !isDelayEdge(e));
-		const delayInputs = inputEdges.filter((e) => isDelayEdge(e));
+		const forwardInputs = inputEdges.filter((e) => !isFeedbackEdge(e));
+		const feedbackInputs = inputEdges.filter((e) => isFeedbackEdge(e));
 
 		const issues: Issue[] = [];
 
@@ -351,7 +351,7 @@ export class HydraEngine {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			chain = (this.generators as any)[node.type](...callArgs);
 		} else if (tType === 'coord' || tType === 'color') {
-			// Unary operation: either forward input, or purely feedback via delay edge.
+			// Unary operation: either forward input, or purely feedback.
 			// Prefer forward input if present; static validation should ensure there is at least one total.
 			let baseChainResult: BuildResult;
 
@@ -367,7 +367,7 @@ export class HydraEngine {
 					new Set([...stack, nodeId]),
 					memo
 				);
-			} else if (delayInputs.length > 0) {
+			} else if (feedbackInputs.length > 0) {
 				// Feedback-only case: use src(o_outputIndex) as the base chain
 				baseChainResult = this.buildFeedbackChainForOutput(outputIndex, node.id);
 			} else {
@@ -403,7 +403,7 @@ export class HydraEngine {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			chain = (baseChainResult.chain as any)[node.type](...callArgs);
 		} else if (tType === 'combine' || tType === 'combineCoord') {
-			// Binary operation: each input slot (input-0, input-1) can be forward or delay.
+			// Binary operation: each input slot (input-0, input-1) can be forward or feedback.
 
 			const getEdgeForInputIndex = (index: 0 | 1): IREdge | undefined => {
 				const handleId = `input-${index}`;
@@ -436,7 +436,7 @@ export class HydraEngine {
 			}
 
 			const buildInputChain = (edge: IREdge): BuildResult => {
-				if (isDelayEdge(edge)) {
+				if (isFeedbackEdge(edge)) {
 					// Feedback for this input
 					return this.buildFeedbackChainForOutput(outputIndex, node.id);
 				}
@@ -493,7 +493,7 @@ export class HydraEngine {
 		nodeId: string,
 		outputIndex: number
 	): { ok: true } | { ok: false; issues: Issue[] } {
-		// Delay edges are interpreted as feedback from the relevant Hydra output.
+		// Feedback edges are interpreted as feedback from the relevant Hydra output.
 		// Build nodeById once and pass it through to avoid rebuilding on every recursion.
 		const nodeById = new Map(nodes.map((n) => [n.id, n]));
 		const result = this.buildChainValidated(nodes, edges, nodeId, outputIndex, nodeById);

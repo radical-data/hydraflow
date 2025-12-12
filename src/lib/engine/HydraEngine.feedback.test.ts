@@ -117,7 +117,7 @@ describe('HydraEngine feedback', () => {
 
 		const edges: IREdge[] = [
 			{ id: 'e1', source: 'osc-1', target: 'rotate-1' },
-			{ id: 'e2', source: 'rotate-1', target: 'rotate-1', delayFrames: 1 }, // feedback cycle
+			{ id: 'e2', source: 'rotate-1', target: 'rotate-1', isFeedback: true }, // feedback cycle
 			{ id: 'e3', source: 'rotate-1', target: 'out-1' }
 		];
 
@@ -152,7 +152,7 @@ describe('HydraEngine feedback', () => {
 		];
 
 		const edges: IREdge[] = [
-			{ id: 'e1', source: 'rotate-1', target: 'rotate-1', delayFrames: 1 }, // purely feedback
+			{ id: 'e1', source: 'rotate-1', target: 'rotate-1', isFeedback: true }, // purely feedback
 			{ id: 'e2', source: 'rotate-1', target: 'out-1' }
 		];
 
@@ -194,7 +194,7 @@ describe('HydraEngine feedback', () => {
 				source: 'blend-1',
 				target: 'blend-1',
 				targetHandle: 'input-1',
-				delayFrames: 1
+				isFeedback: true
 			}, // feedback on second input
 			{ id: 'e3', source: 'blend-1', target: 'out-1' }
 		];
@@ -231,14 +231,14 @@ describe('HydraEngine feedback', () => {
 				source: 'blend-1',
 				target: 'blend-1',
 				targetHandle: 'input-0',
-				delayFrames: 1
+				isFeedback: true
 			},
 			{
 				id: 'e2',
 				source: 'blend-1',
 				target: 'blend-1',
 				targetHandle: 'input-1',
-				delayFrames: 1
+				isFeedback: true
 			},
 			{ id: 'e3', source: 'blend-1', target: 'out-1' }
 		];
@@ -286,7 +286,7 @@ describe('HydraEngine feedback', () => {
 		];
 
 		const edges: IREdge[] = [
-			{ id: 'e1', source: 'rotate-1', target: 'rotate-1', delayFrames: 1 },
+			{ id: 'e1', source: 'rotate-1', target: 'rotate-1', isFeedback: true },
 			{ id: 'e2', source: 'rotate-1', target: 'out-1' }
 		];
 

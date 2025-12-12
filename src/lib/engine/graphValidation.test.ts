@@ -146,7 +146,7 @@ describe('validateGraph', () => {
 		expect(cycleIssues.some((i) => i.nodeId === 'rotate-1' || i.nodeId === 'rotate-2')).toBe(true);
 	});
 
-	it('delay edge cycle should not be reported as CYCLE error', () => {
+	it('feedback edge cycle should not be reported as CYCLE error', () => {
 		const nodes: IRNode[] = [
 			{ id: 'src-1', type: 'src', data: {}, position: { x: 0, y: 0 } },
 			{ id: 'rotate-1', type: 'rotate', data: { angle: 0.5 }, position: { x: 100, y: 0 } },
@@ -157,7 +157,7 @@ describe('validateGraph', () => {
 		const edges: IREdge[] = [
 			{ id: 'e1', source: 'src-1', target: 'rotate-1' },
 			{ id: 'e2', source: 'rotate-1', target: 'rotate-2' },
-			{ id: 'e3', source: 'rotate-2', target: 'rotate-1', delayFrames: 1 },
+			{ id: 'e3', source: 'rotate-2', target: 'rotate-1', isFeedback: true },
 			{ id: 'e4', source: 'rotate-1', target: 'out-1' }
 		];
 
@@ -173,7 +173,7 @@ describe('validateGraph', () => {
 		expect(result.nodeStatusById.get('rotate-2')?.hasError).toBe(false);
 	});
 
-	it('unary node with only a delay input is structurally valid', () => {
+	it('unary node with only a feedback input is structurally valid', () => {
 		const nodes: IRNode[] = [
 			{ id: 'src-1', type: 'src', data: {}, position: { x: 0, y: 0 } },
 			{ id: 'rotate-1', type: 'rotate', data: { angle: 0.5 }, position: { x: 100, y: 0 } },
@@ -181,7 +181,7 @@ describe('validateGraph', () => {
 		];
 
 		const edges: IREdge[] = [
-			{ id: 'e1', source: 'rotate-1', target: 'rotate-1', delayFrames: 1 }, // purely feedback
+			{ id: 'e1', source: 'rotate-1', target: 'rotate-1', isFeedback: true }, // purely feedback
 			{ id: 'e2', source: 'rotate-1', target: 'out-1' }
 		];
 

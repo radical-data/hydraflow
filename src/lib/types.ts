@@ -54,12 +54,10 @@ export interface IREdge {
 	targetHandle?: string;
 
 	/**
-	 * Number of frames of delay for this edge.
-	 * - undefined or 0 => normal edge (same frame)
-	 * - 1 => previous frame
-	 * - N => N frames ago (future extension; for now we only ever set 1)
+	 * If true, this edge reads the previous frame (feedback) from the current Hydra output.
+	 * Feedback edges count towards arity but are ignored for same-frame cycle detection.
 	 */
-	delayFrames?: number;
+	isFeedback?: boolean;
 }
 
 export interface PatchDocument {

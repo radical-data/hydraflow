@@ -24,10 +24,10 @@
 	const hasWarning = $derived(!hasError && !!validationStatus?.hasWarning);
 	const isDead = $derived(!!validationStatus?.isDead);
 
-	// Delay edges represent feedback connections: previous-frame input from a Hydra output
+	// Feedback edges read the previous frame from the current output
 	const getEdgeById = getContext<EdgeById>('edgeById')!;
 	const edge = $derived(getEdgeById().get(id) ?? null);
-	const isDelayEdge = $derived(!!edge && (edge.delayFrames ?? 0) > 0);
+	const isFeedbackEdge = $derived(!!edge && edge.isFeedback === true);
 
 	const edgeStyle = $derived(
 		hasError
@@ -36,9 +36,15 @@
 				? 'stroke: #f59e0b; stroke-width: 2px;'
 				: isDead
 					? 'stroke: #9ca3af; stroke-width: 1.5px; stroke-dasharray: 6 4; opacity: 0.5;'
-					: isDelayEdge
+					: isFeedbackEdge
 						? 'stroke: #6366f1; stroke-width: 1.5px; stroke-dasharray: 4 3;'
 						: undefined
+	);
+
+	const edgeAriaLabel = $derived(
+		isFeedbackEdge
+			? 'Feedback edge: uses the previous frame from the current output, not the current frame'
+			: undefined
 	);
 
 	const [edgePath] = $derived(
@@ -63,7 +69,7 @@
 </script>
 
 {#if !reconnecting}
-	<BaseEdge path={edgePath} style={edgeStyle} />
+	<BaseEdge path={edgePath} style={edgeStyle} aria-label={edgeAriaLabel} />
 {/if}
 
 {#if selected}
