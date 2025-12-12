@@ -52,6 +52,12 @@ export interface IREdge {
 	target: string;
 	sourceHandle?: string;
 	targetHandle?: string;
+
+	/**
+	 * If true, this edge reads the previous frame (feedback) from the current Hydra output.
+	 * Feedback edges count towards arity but are ignored for same-frame cycle detection.
+	 */
+	isFeedback?: boolean;
 }
 
 export interface PatchDocument {

@@ -2,15 +2,22 @@ import type { IREdge, IRNode } from '../types.js';
 import {
 	dedupeIssues,
 	type GraphValidationResult,
+	isFeedbackEdge,
 	type Issue,
 	makeIssueKey,
 	rebuildGraphValidationResult,
 	type TransformMeta,
-	type TransformType,
 	validateGraph as validateGraphStatic
 } from './graphValidation.js';
 
 export type { Issue, IssueKind, IssueSeverity } from './graphValidation.js';
+
+/**
+ * Feedback edges (edge.isFeedback === true) read the previous frame from the current output.
+ * - Feedback edges count towards node arity but don't participate in same-frame cycle detection.
+ * - At runtime, feedback edges become src(o_k) chains where k is the output index.
+ * - Feedback is per output: when building the chain for output k, all feedback edges read from src(o_k).
+ */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuildResult = { ok: true; chain: any } | { ok: false; issues: Issue[] };
@@ -124,43 +131,97 @@ export class HydraEngine {
 		}
 	}
 
-	private validateNodeArity(node: IRNode, tType: TransformType, inputEdges: IREdge[]): Issue[] {
-		const issues: Issue[] = [];
-		void tType;
-		const want = this.meta.arityByName.get(node.type);
-		const have = inputEdges.length;
-
-		if (want == null || have === want) return issues;
-
-		if (have < want) {
-			issues.push({
-				key: makeIssueKey('NODE_MISSING_INPUTS', [node.id, node.type, want, have]),
-				kind: 'NODE_MISSING_INPUTS',
-				severity: 'error',
-				message: `${node.type} expects ${want} input(s), found ${have}`,
-				nodeId: node.id
-			});
-		} else {
-			issues.push({
-				key: makeIssueKey('NODE_EXTRA_INPUTS', [node.id, node.type, want, have]),
-				kind: 'NODE_EXTRA_INPUTS',
-				severity: 'warning',
-				message: `${node.type} expects ${want} input(s), found ${have}`,
-				nodeId: node.id
-			});
+	private buildFeedbackChainForOutput(outputIndex: number, nodeIdForErrors: string): BuildResult {
+		if (!this.hydra) {
+			return {
+				ok: false,
+				issues: [
+					{
+						key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [nodeIdForErrors, outputIndex]),
+						kind: 'RUNTIME_EXECUTION_ERROR',
+						severity: 'error',
+						message: 'Hydra is not initialised; cannot build feedback chain',
+						nodeId: nodeIdForErrors,
+						outputIndex
+					}
+				]
+			};
 		}
 
-		return issues;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const gens = this.generators as any;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const hydraAny = this.hydra as any;
+
+		const output = hydraAny.outputs?.[outputIndex];
+
+		if (!output) {
+			return {
+				ok: false,
+				issues: [
+					{
+						key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [nodeIdForErrors, outputIndex]),
+						kind: 'RUNTIME_EXECUTION_ERROR',
+						severity: 'error',
+						message: `Output ${outputIndex} not available for feedback`,
+						nodeId: nodeIdForErrors,
+						outputIndex
+					}
+				]
+			};
+		}
+
+		try {
+			if (typeof gens.src !== 'function') {
+				return {
+					ok: false,
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [nodeIdForErrors, outputIndex]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message: 'Hydra "src" generator is not available for feedback',
+							nodeId: nodeIdForErrors,
+							outputIndex
+						}
+					]
+				};
+			}
+
+			// hydra-ts's src(oX) = previous frame of that output
+			const chain = gens.src(output);
+			return { ok: true, chain };
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : 'Unknown error while building feedback chain';
+			return {
+				ok: false,
+				issues: [
+					{
+						key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [nodeIdForErrors, outputIndex]),
+						kind: 'RUNTIME_EXECUTION_ERROR',
+						severity: 'error',
+						message,
+						nodeId: nodeIdForErrors,
+						outputIndex
+					}
+				]
+			};
+		}
 	}
 
 	private buildChainValidated(
 		nodes: IRNode[],
 		edges: IREdge[],
 		nodeId: string,
+		outputIndex: number,
+		nodeById: Map<string, IRNode>,
 		stack = new Set<string>(),
 		memo = new Map<string, BuildResult>()
 	): BuildResult {
-		// Check for cycles
+		// Note: Structural validation (arity, cycles, unknown transforms) is handled by
+		// validateGraphStatic. This method only reports runtime execution failures.
+
 		if (stack.has(nodeId)) {
 			const result: BuildResult = {
 				ok: false,
@@ -169,7 +230,7 @@ export class HydraEngine {
 						key: makeIssueKey('CYCLE', [nodeId]),
 						kind: 'CYCLE',
 						severity: 'error',
-						message: `Cycle detected involving node ${nodeId}`,
+						message: `Same-frame cycle detected involving node ${nodeId} (feedback edges break cycles)`,
 						nodeId
 					}
 				]
@@ -177,14 +238,11 @@ export class HydraEngine {
 			return result;
 		}
 
-		// Check memo cache
 		if (memo.has(nodeId)) {
 			return memo.get(nodeId)!;
 		}
 
-		// Find node
-		const byId = new Map(nodes.map((n) => [n.id, n]));
-		const node = byId.get(nodeId);
+		const node = nodeById.get(nodeId);
 		if (!node) {
 			const result: BuildResult = {
 				ok: false,
@@ -251,7 +309,6 @@ export class HydraEngine {
 			return result;
 		}
 
-		// Validate transform exists
 		const tType = this.meta.typeByName.get(node.type);
 		if (!tType) {
 			const result: BuildResult = {
@@ -270,86 +327,144 @@ export class HydraEngine {
 			return result;
 		}
 
-		// Validate arity
+		// Split inputs into forward vs feedback
 		const inputEdges = edges.filter((e) => e.target === nodeId);
-		const issues: Issue[] = this.validateNodeArity(node, tType, inputEdges);
+		const forwardInputs = inputEdges.filter((e) => !isFeedbackEdge(e));
+		const feedbackInputs = inputEdges.filter((e) => isFeedbackEdge(e));
 
-		const want = this.meta.arityByName.get(node.type);
-		if (want != null && inputEdges.length < want) {
-			const result: BuildResult = { ok: false, issues };
-			memo.set(nodeId, result);
-			return result;
-		}
+		const issues: Issue[] = [];
 
-		// Gather arguments
 		const allNames = this.meta.inputsByName.get(node.type) ?? [];
 		const paramNames =
 			tType === 'combine' || tType === 'combineCoord'
-				? allNames.slice(1) // drop the implicit 'color' (the second chain)
+				? allNames.slice(1) // drop the implicit 'color' chain parameter
 				: allNames;
 
 		const rawArgs = paramNames.map((k: string) => (node.data ?? {})[k]);
 
-		// Build chain based on type
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		let chain: any = null;
 
 		if (tType === 'src') {
+			// Pure source node: no incoming edges
 			const callArgs = trimUndefTail(rawArgs);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			chain = (this.generators as any)[node.type](...callArgs);
 		} else if (tType === 'coord' || tType === 'color') {
-			// Unary operation
-			const inputResult = this.buildChainValidated(
-				nodes,
-				edges,
-				inputEdges[0].source,
-				new Set([...stack, nodeId]),
-				memo
-			);
-			if (!inputResult.ok) {
+			// Unary operation: either forward input, or purely feedback.
+			// Prefer forward input if present; static validation should ensure there is at least one total.
+			let baseChainResult: BuildResult;
+
+			if (forwardInputs.length > 0) {
+				// Normal case: recurse into the forward input chain
+				const forward = forwardInputs[0];
+				baseChainResult = this.buildChainValidated(
+					nodes,
+					edges,
+					forward.source,
+					outputIndex,
+					nodeById,
+					new Set([...stack, nodeId]),
+					memo
+				);
+			} else if (feedbackInputs.length > 0) {
+				// Feedback-only case: use src(o_outputIndex) as the base chain
+				baseChainResult = this.buildFeedbackChainForOutput(outputIndex, node.id);
+			} else {
+				// Should be impossible if graphValidation is working; treat as runtime error.
+				const message = `${node.type} has no input at runtime (expected 1, found 0)`;
 				const result: BuildResult = {
 					ok: false,
-					issues: [...issues, ...(inputResult as { ok: false; issues: Issue[] }).issues]
+					issues: [
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id, outputIndex]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message,
+							nodeId: node.id,
+							outputIndex
+						}
+					]
 				};
-				memo.set(nodeId, result);
+				memo.set(node.id, result);
+				return result;
+			}
+
+			if (!baseChainResult.ok) {
+				const result: BuildResult = {
+					ok: false,
+					issues: [...issues, ...baseChainResult.issues]
+				};
+				memo.set(node.id, result);
 				return result;
 			}
 
 			const callArgs = trimUndefTail(rawArgs);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			chain = (inputResult.chain as any)[node.type](...callArgs);
+			chain = (baseChainResult.chain as any)[node.type](...callArgs);
 		} else if (tType === 'combine' || tType === 'combineCoord') {
-			// Binary operation
-			const sorted = inputEdges.sort((a, b) =>
-				(a.targetHandle ?? 'input-0').localeCompare(b.targetHandle ?? 'input-0')
-			);
+			// Binary operation: each input slot (input-0, input-1) can be forward or feedback.
 
-			const aResult = this.buildChainValidated(
-				nodes,
-				edges,
-				sorted[0].source,
-				new Set([...stack, nodeId]),
-				memo
-			);
-			const bResult = this.buildChainValidated(
-				nodes,
-				edges,
-				sorted[1].source,
-				new Set([...stack, nodeId]),
-				memo
-			);
+			const getEdgeForInputIndex = (index: 0 | 1): IREdge | undefined => {
+				const handleId = `input-${index}`;
+				return inputEdges.find((e) => (e.targetHandle ?? 'input-0') === handleId);
+			};
+
+			const edge0 = getEdgeForInputIndex(0);
+			const edge1 = getEdgeForInputIndex(1);
+
+			// Defensive: if static validation failed somehow and we don't have two inputs, bail out
+			if (!edge0 || !edge1) {
+				const have = [edge0, edge1].filter(Boolean).length;
+				const message = `${node.type} expects 2 inputs at runtime, found ${have}`;
+				const result: BuildResult = {
+					ok: false,
+					issues: [
+						...issues,
+						{
+							key: makeIssueKey('RUNTIME_EXECUTION_ERROR', [node.id, outputIndex]),
+							kind: 'RUNTIME_EXECUTION_ERROR',
+							severity: 'error',
+							message,
+							nodeId: node.id,
+							outputIndex
+						}
+					]
+				};
+				memo.set(node.id, result);
+				return result;
+			}
+
+			const buildInputChain = (edge: IREdge): BuildResult => {
+				if (isFeedbackEdge(edge)) {
+					// Feedback for this input
+					return this.buildFeedbackChainForOutput(outputIndex, node.id);
+				}
+
+				return this.buildChainValidated(
+					nodes,
+					edges,
+					edge.source,
+					outputIndex,
+					nodeById,
+					new Set([...stack, node.id]),
+					memo
+				);
+			};
+
+			const aResult = buildInputChain(edge0);
+			const bResult = buildInputChain(edge1);
 
 			if (!aResult.ok || !bResult.ok) {
 				const result: BuildResult = {
 					ok: false,
 					issues: [
 						...issues,
-						...(aResult.ok ? [] : (aResult as { ok: false; issues: Issue[] }).issues),
-						...(bResult.ok ? [] : (bResult as { ok: false; issues: Issue[] }).issues)
+						...(aResult.ok ? [] : aResult.issues),
+						...(bResult.ok ? [] : bResult.issues)
 					]
 				};
-				memo.set(nodeId, result);
+				memo.set(node.id, result);
 				return result;
 			}
 
@@ -358,7 +473,7 @@ export class HydraEngine {
 			chain = (aResult.chain as any)[node.type](bResult.chain, ...callArgs);
 		}
 
-		const result = { ok: true, chain } as BuildResult;
+		const result: BuildResult = { ok: true, chain };
 		memo.set(nodeId, result);
 		return result;
 	}
@@ -378,7 +493,10 @@ export class HydraEngine {
 		nodeId: string,
 		outputIndex: number
 	): { ok: true } | { ok: false; issues: Issue[] } {
-		const result = this.buildChainValidated(nodes, edges, nodeId);
+		// Feedback edges are interpreted as feedback from the relevant Hydra output.
+		// Build nodeById once and pass it through to avoid rebuilding on every recursion.
+		const nodeById = new Map(nodes.map((n) => [n.id, n]));
+		const result = this.buildChainValidated(nodes, edges, nodeId, outputIndex, nodeById);
 		if (!result.ok) {
 			return result;
 		}
