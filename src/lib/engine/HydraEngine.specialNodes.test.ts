@@ -1,45 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { IREdge, IRNode } from '../types.js';
+import {
+	createFakeGeneratorsForSpecialNodes,
+	createFakeHydraWithCamera
+} from './__testutils__/fakeHydra.js';
 import { HydraEngine } from './HydraEngine.js';
 import {
 	addCustomSpecsForMeta,
 	buildHydraTransformSpecs,
 	buildMetaFromSpecs
 } from './transformRegistry.js';
-
-function createFakeHydra() {
-	const outputs = [{}, {}, {}, {}];
-	const sources = [{ initCam: vi.fn() }];
-	return {
-		outputs,
-		sources,
-		setResolution: vi.fn(),
-		loop: {
-			start: vi.fn(),
-			stop: vi.fn()
-		},
-		hush: vi.fn()
-	};
-}
-
-function createFakeGenerators() {
-	const srcChain = {
-		out: vi.fn()
-	};
-	const solidChain = {
-		out: vi.fn()
-	};
-	const oscChain = {
-		out: vi.fn()
-	};
-
-	return {
-		src: vi.fn(() => srcChain),
-		solid: vi.fn(() => solidChain),
-		osc: vi.fn(() => oscChain)
-	};
-}
 
 describe('HydraEngine special nodes', () => {
 	it('camera → out calls src(source0) and .out(output0)', async () => {
@@ -49,10 +20,10 @@ describe('HydraEngine special nodes', () => {
 		const metaSpecs = addCustomSpecsForMeta(hydraSpecs);
 		const meta = buildMetaFromSpecs(metaSpecs);
 
-		const generators = createFakeGenerators();
+		const { generators, chains } = createFakeGeneratorsForSpecialNodes();
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraWithCamera();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,8 +49,7 @@ describe('HydraEngine special nodes', () => {
 		expect(generators.src).toHaveBeenCalledWith(fakeHydra.sources[0]);
 
 		// Verify .out was called with outputs[0]
-		const srcChain = generators.src.mock.results[0].value;
-		expect(srcChain.out).toHaveBeenCalledWith(fakeHydra.outputs[0]);
+		expect(chains.srcChain.out).toHaveBeenCalledWith(fakeHydra.outputs[0]);
 	});
 
 	it('osc → out(outputIndex=1) routes to outputs[1]', async () => {
@@ -101,10 +71,10 @@ describe('HydraEngine special nodes', () => {
 		const metaSpecs = addCustomSpecsForMeta(hydraSpecs);
 		const meta = buildMetaFromSpecs(metaSpecs);
 
-		const generators = createFakeGenerators();
+		const { generators, chains } = createFakeGeneratorsForSpecialNodes();
 		const engine = new HydraEngine(meta, generators);
 
-		const fakeHydra = createFakeHydra();
+		const fakeHydra = createFakeHydraWithCamera();
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(engine as any).hydra = fakeHydra;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,8 +97,7 @@ describe('HydraEngine special nodes', () => {
 		expect(generators.osc).toHaveBeenCalled();
 
 		// Verify .out was called with outputs[1]
-		const oscChain = generators.osc.mock.results[0].value;
-		expect(oscChain.out).toHaveBeenCalledTimes(1);
-		expect(oscChain.out).toHaveBeenCalledWith(fakeHydra.outputs[1]);
+		expect(chains.oscChain.out).toHaveBeenCalledTimes(1);
+		expect(chains.oscChain.out).toHaveBeenCalledWith(fakeHydra.outputs[1]);
 	});
 });
