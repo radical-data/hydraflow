@@ -412,7 +412,7 @@
 			</SvelteFlow>
 		{:else}
 			<div class="loading-canvas">
-				<div class="loading-message">Initializing Hydra Flow...</div>
+				<div class="loading-message">Initializing Mangl...</div>
 			</div>
 		{/if}
 	</div>
